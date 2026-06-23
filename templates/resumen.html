@@ -22,6 +22,8 @@
     .barra-fill.rojo { background: #ef4444; }
     .cat-msg { margin-top: .7rem; font-size: .92rem; line-height: 1.45; }
     .nota-cat { color: #888; font-size: .78rem; margin: .3rem 0 0; }
+    .link-btn { background: none; border: none; color: #60a5fa; cursor: pointer; font-size: .78rem; padding: 0 .2rem; text-decoration: underline; }
+    .link-btn:disabled { color: #888; cursor: progress; text-decoration: none; }
     table { width: 100%; border-collapse: collapse; font-size: .95rem; margin-top: 1rem; }
     th, td { padding: .6rem .5rem; border-bottom: 1px solid #3334; }
     th { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: #888; text-align: left; }
@@ -108,7 +110,12 @@
     </div>
     {% endif %}
   </div>
-  {% if cat_info %}<p class="nota-cat">Topes de ingresos brutos vigentes desde {{ vigente_desde }} (ARCA).</p>{% endif %}
+  <p class="nota-cat">
+    Topes vigentes desde {{ vigente_desde }} (ARCA){% if topes_actualizado %} · actualizados el {{ topes_actualizado }}{% endif %}.
+    <form method="post" style="display:inline" id="form-topes">
+      <button type="submit" name="refrescar_topes" value="1" id="btn-topes" class="link-btn">↻ Actualizar desde ARCA</button>
+    </form>
+  </p>
 
   {% if meses %}
   <p class="leyenda">
@@ -173,6 +180,11 @@
       const b = document.getElementById('btn-csv');
       b.disabled = true;
       b.innerHTML = '<span class="spinner"></span>Importando…';
+    });
+    document.getElementById('form-topes').addEventListener('submit', () => {
+      const b = document.getElementById('btn-topes');
+      b.disabled = true;
+      b.textContent = 'Consultando ARCA…';
     });
   </script>
 </body>

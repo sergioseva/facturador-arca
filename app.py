@@ -5,6 +5,7 @@ Una sola clave para entrar, un campo "monto", y al darle "Facturar" se conecta
 a los web services de ARCA (WSAA + WSFEv1) y genera la Factura C con su CAE.
 """
 
+import json
 import os
 from datetime import datetime, timedelta
 from functools import wraps
@@ -141,13 +142,40 @@ def index():
     )
 
 
+def _topes_vigentes():
+    """Topes guardados desde ARCA (si se actualizaron) o los de categorias.py."""
+    raw = db.get_config("topes_json")
+    if raw:
+        try:
+            return (
+                json.loads(raw),
+                db.get_config("topes_vigente_desde", categorias.VIGENTE_DESDE),
+                db.get_config("topes_actualizado"),
+            )
+        except (ValueError, TypeError):
+            pass
+    return dict(categorias.TOPES), categorias.VIGENTE_DESDE, None
+
+
 @app.route("/resumen", methods=["GET", "POST"])
 @login_required
 def resumen():
     msg = None
     error = None
     if request.method == "POST":
-        if "categoria" in request.form:
+        if "refrescar_topes" in request.form:
+            try:
+                topes, vigente = categorias.fetch_topes_arca()
+                db.set_config("topes_json", json.dumps(topes))
+                db.set_config("topes_vigente_desde", vigente)
+                db.set_config(
+                    "topes_actualizado",
+                    datetime.now(afip.AR_TZ).strftime("%d/%m/%Y %H:%M"),
+                )
+                msg = f"Topes actualizados desde ARCA (vigentes desde {vigente})."
+            except Exception as e:  # noqa: BLE001
+                error = f"No pude actualizar los topes desde ARCA: {e}"
+        elif "categoria" in request.form:
             cat = request.form["categoria"].strip().upper()
             if cat in categorias.TOPES or cat == "":
                 db.set_config("categoria", cat)
@@ -176,11 +204,12 @@ def resumen():
     detalle = db.resumen_detallado(ENTORNO, hace_12)
 
     # Cálculo de la categoría: tope, cuánto falta, porcentaje, sugerida.
+    topes, vigente_desde, topes_actualizado = _topes_vigentes()
     cat = db.get_config("categoria", "")
     total = detalle["movil"]["total"]
     cat_info = None
-    if cat in categorias.TOPES:
-        tope = categorias.TOPES[cat]
+    if cat in topes:
+        tope = topes[cat]
         cat_info = {
             "categoria": cat,
             "tope": tope,
@@ -188,7 +217,7 @@ def resumen():
             "excedido": total > tope,
             "pct": min(total / tope * 100, 100) if tope else 0,
             "pct_real": (total / tope * 100) if tope else 0,
-            "sugerida": categorias.categoria_para(total),
+            "sugerida": categorias.categoria_para(total, topes),
         }
 
     return render_template(
@@ -201,8 +230,9 @@ def resumen():
         error=error,
         categoria=cat,
         cat_info=cat_info,
-        topes=categorias.TOPES,
-        vigente_desde=categorias.VIGENTE_DESDE,
+        topes=topes,
+        vigente_desde=vigente_desde,
+        topes_actualizado=topes_actualizado,
     )
 
 
