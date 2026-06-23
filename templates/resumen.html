@@ -30,13 +30,22 @@
 <body>
   <a class="volver" href="{{ url_for('index') }}">← Volver a facturar</a>
   <h1>📊 Control monotributo</h1>
-  <p style="color:#888;font-size:.9rem">Pto. venta {{ punto_venta }} · Factura C · entorno {{ entorno }}</p>
+  <p style="color:#888;font-size:.9rem">Total de TODOS tus comprobantes (todos los puntos de venta) · entorno {{ entorno }}</p>
 
-  <form method="post" class="sync" id="form-sync">
-    <button type="submit" id="btn-sync">Actualizar desde ARCA</button>
-    {% if sync_msg %}<span class="ok">{{ sync_msg }}</span>{% endif %}
-    {% if sync_error %}<span class="err">❌ {{ sync_error }}</span>{% endif %}
+  <form method="post" class="sync" id="form-csv" enctype="multipart/form-data">
+    <input type="file" name="csv" accept=".zip,.csv" id="input-csv" required>
+    <button type="submit" id="btn-csv">Importar ZIP / CSV</button>
+    {% if msg %}<span class="ok">{{ msg }}</span>{% endif %}
+    {% if error %}<span class="err">❌ {{ error }}</span>{% endif %}
   </form>
+
+  {% if info %}
+  <p style="color:#888;font-size:.85rem">
+    Datos cargados: {{ info.cant }} comprobantes de {{ info.pvs }} punto(s) de venta,
+    del {{ info.desde[6:8] }}/{{ info.desde[4:6] }}/{{ info.desde[0:4] }}
+    al {{ info.hasta[6:8] }}/{{ info.hasta[4:6] }}/{{ info.hasta[0:4] }}.
+  </p>
+  {% endif %}
 
   <div class="destacado">
     <small>Acumulado últimos 12 meses (móvil) — {{ movil12.cantidad }} comprobantes</small>
@@ -46,7 +55,7 @@
   {% if meses %}
   <table>
     <thead>
-      <tr><th>Mes</th><th class="num">Facturas</th><th class="num">Total facturado</th></tr>
+      <tr><th>Mes</th><th class="num">Comprobantes</th><th class="num">Total facturado</th></tr>
     </thead>
     <tbody>
       {% for m in meses %}
@@ -59,20 +68,30 @@
     </tbody>
   </table>
   {% else %}
-  <p style="color:#888;margin-top:1.5rem">Todavía no sincronizaste. Tocá <b>"Actualizar desde ARCA"</b> para traer tus comprobantes.</p>
+  <p style="color:#888;margin-top:1.5rem">Todavía no importaste ningún CSV. Seguí los pasos de abajo.</p>
   {% endif %}
 
-  <p class="nota">
-    Los totales se leen directo de ARCA (incluye facturas hechas fuera de esta app).
-    Cubre este punto de venta y Factura C. El acumulado de 12 meses es el período
-    móvil que usa ARCA para la categoría — actualizá los topes según la tabla vigente.
-  </p>
+  <div class="nota">
+    <b style="color:#aaa">Cómo exportar el CSV de Mis Comprobantes:</b>
+    <ol style="margin:.4rem 0 0; padding-left:1.2rem; line-height:1.5">
+      <li>Entrá a ARCA → servicio <b>"Mis Comprobantes"</b> → <b>Emitidos</b>.</li>
+      <li>Elegí el rango de fechas (ej. los últimos 12 meses) y <b>Buscar</b>.</li>
+      <li>Descargá el archivo (AFIP lo da en <b>ZIP</b>; también sirve el CSV suelto).</li>
+      <li>Subilo acá tal cual con <b>"Importar ZIP / CSV"</b> — no hace falta descomprimirlo.</li>
+    </ol>
+    <p style="margin-top:.8rem">
+      Incluye <b>todos</b> los puntos de venta y tipos de comprobante (las notas de
+      crédito restan). Reimportar un rango que se superpone no duplica. El acumulado
+      de 12 meses es el período móvil que mira ARCA — compará contra la tabla de
+      topes vigente.
+    </p>
+  </div>
 
   <script>
-    document.getElementById('form-sync').addEventListener('submit', () => {
-      const b = document.getElementById('btn-sync');
+    document.getElementById('form-csv').addEventListener('submit', () => {
+      const b = document.getElementById('btn-csv');
       b.disabled = true;
-      b.innerHTML = '<span class="spinner"></span>Consultando ARCA…';
+      b.innerHTML = '<span class="spinner"></span>Importando…';
     });
   </script>
 </body>

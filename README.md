@@ -20,9 +20,11 @@ ingresás monto → WSAA (autentica con tu certificado) → WSFEv1 (pide el CAE)
 - **Spinner** mientras espera la respuesta de ARCA, para que no parezca colgado.
 - **Historial de intentos** (SQLite): guarda **todas** las facturas, las
   emitidas y las que fallaron, con el mensaje de error de ARCA.
-- **Control monotributo**: sincroniza tus comprobantes desde ARCA y te muestra
-  el **total facturado por mes** y el **acumulado móvil de los últimos 12 meses**
-  (el número que mira ARCA para la categoría).
+- **Control monotributo**: importás el **ZIP/CSV de "Mis Comprobantes"** (que
+  incluye **todos** los puntos de venta y tipos, no solo lo emitido por esta app)
+  y te muestra el **total facturado por mes** y el **acumulado móvil de los
+  últimos 12 meses** (el número que mira ARCA para la categoría). Las notas de
+  crédito restan; reimportar rangos superpuestos no duplica.
 
 ## Páginas
 
@@ -30,7 +32,7 @@ ingresás monto → WSAA (autentica con tu certificado) → WSFEv1 (pide el CAE)
 |------|-------------|
 | `/` | Formulario para emitir la factura (monto + fecha). |
 | `/historial` | Tabla de todos los intentos (emitidos y con error) + resumen. |
-| `/resumen` | Control monotributo: total por mes y acumulado 12 meses. |
+| `/resumen` | Control monotributo: importar ZIP/CSV de Mis Comprobantes, total por mes y acumulado 12 meses. |
 | `/login` `/logout` | Acceso con la clave. |
 
 ## Estructura del proyecto
@@ -201,11 +203,12 @@ facturador.tudominio.com {
   un **Token + Sign** que valen ~12 hs. Se cachean en `data/ta_*.json` y se
   renuevan solos.
 - **WSFEv1** (`afip.py`, vía `zeep`): pide el próximo número con
-  `FECompUltimoAutorizado`, emite con `FECAESolicitar` (Factura C, doc receptor
-  99 = Consumidor Final, condición IVA receptor 5 según RG 5616), y para el
-  control mensual consulta cada comprobante con `FECompConsultar`.
+  `FECompUltimoAutorizado` y emite con `FECAESolicitar` (Factura C, doc receptor
+  99 = Consumidor Final, condición IVA receptor 5 según RG 5616). Los servidores
+  de **producción** usan Diffie-Hellman de 1024 bits, así que se baja el nivel
+  SSL a `SECLEVEL=1` solo para hablar con ARCA (`_AfipSSLAdapter`).
 - **SQLite** (`db.py`): tabla `facturas` (intentos: emitidos y con error) y
-  `arca_comprobantes` (espejo de lo leído de ARCA para los totales).
+  `mis_comprobantes` (lo importado del CSV de Mis Comprobantes para los totales).
 
 ---
 
@@ -215,12 +218,13 @@ facturador.tudominio.com {
   cuando el total supera cierto umbral. Por debajo va como Consumidor Final
   (doc 99). Si facturás montos altos a una persona, hay que agregar el campo del
   receptor.
-- **Control monotributo**: los totales se leen directo de ARCA (incluye facturas
-  hechas fuera de esta app), pero cubren **este punto de venta + Factura C**. El
-  límite del monotributo se calcula sobre **toda** tu facturación (todos los PV y
-  tipos de comprobante); si facturás por otros lados, sumalos aparte. El tope de
-  categoría **no está hardcodeado** porque ARCA lo actualiza cada tanto:
-  comparalo contra la tabla vigente.
+- **Control monotributo**: el web service (WSFEv1) **solo puede leer el punto de
+  venta de Web Services**, no los del facturador online de AFIP (devuelve error
+  `11002`). Por eso el control se hace **importando el ZIP/CSV de "Mis
+  Comprobantes"**, que sí incluye **todos** los puntos de venta y tipos. El tope
+  de categoría **no está hardcodeado** porque ARCA lo actualiza cada tanto:
+  comparalo contra la tabla vigente. Mis Comprobantes se actualiza con cierto
+  retraso, así que el total llega hasta la fecha del último export importado.
 - **Fecha atrasada**: se puede elegir hasta 10 días hacia atrás (lo que tolera
   ARCA). Los comprobantes deben ir en **orden cronológico**: la fecha no puede
   ser anterior a la de la última factura ya autorizada en ese punto de venta — si

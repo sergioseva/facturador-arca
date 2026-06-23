@@ -143,31 +143,35 @@ def index():
 @app.route("/resumen", methods=["GET", "POST"])
 @login_required
 def resumen():
-    sync_msg = None
-    sync_error = None
+    msg = None
+    error = None
     if request.method == "POST":
-        try:
-            r = afip.sincronizar_comprobantes(
-                cuit=CUIT,
-                entorno=ENTORNO,
-                cert_path=CERT_PATH,
-                key_path=KEY_PATH,
-                punto_venta=PUNTO_VENTA,
-            )
-            sync_msg = f"Sincronizado con ARCA: {r['nuevos']} comprobante(s) nuevo(s) (último N° {r['ultimo']})."
-        except Exception as e:  # noqa: BLE001
-            sync_error = str(e)
+        archivo = request.files.get("csv")
+        if not archivo or not archivo.filename:
+            error = "Elegí el archivo CSV exportado de Mis Comprobantes."
+        else:
+            try:
+                r = db.importar_mis_comprobantes(archivo.read(), ENTORNO)
+                if r.get("error"):
+                    error = r["error"]
+                else:
+                    rango = ""
+                    if r["desde"]:
+                        rango = f" (del {r['desde'][6:8]}/{r['desde'][4:6]}/{r['desde'][0:4]} al {r['hasta'][6:8]}/{r['hasta'][4:6]}/{r['hasta'][0:4]})"
+                    msg = f"Importados {r['importados']} comprobantes{rango}."
+            except Exception as e:  # noqa: BLE001
+                error = f"No pude procesar el CSV: {e}"
 
     # Acumulado móvil de los últimos 12 meses (lo que mira ARCA para la categoría).
     hace_12 = (datetime.now(afip.AR_TZ) - timedelta(days=365)).strftime("%Y%m%d")
     return render_template(
         "resumen.html",
-        meses=db.resumen_mensual(ENTORNO),
-        movil12=db.acumulado_desde(ENTORNO, hace_12),
+        meses=db.resumen_mensual_mis(ENTORNO),
+        movil12=db.acumulado_desde_mis(ENTORNO, hace_12),
+        info=db.info_mis(ENTORNO),
         entorno=ENTORNO,
-        punto_venta=PUNTO_VENTA,
-        sync_msg=sync_msg,
-        sync_error=sync_error,
+        msg=msg,
+        error=error,
     )
 
 
