@@ -23,6 +23,9 @@ from cryptography.hazmat.primitives.serialization import (
     load_pem_private_key,
     pkcs7,
 )
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.ssl_ import create_urllib3_context
 from zeep import Client
 from zeep.transports import Transport
 
@@ -40,6 +43,35 @@ ENDPOINTS = {
 }
 
 AR_TZ = ZoneInfo("America/Argentina/Buenos_Aires")
+
+
+class _AfipSSLAdapter(HTTPAdapter):
+    """
+    Adapter HTTPS que baja el nivel de seguridad de OpenSSL a SECLEVEL=1.
+    Los servidores de PRODUCCIÓN de ARCA negocian Diffie-Hellman de 1024 bits,
+    que el OpenSSL moderno rechaza por defecto (DH_KEY_TOO_SMALL). Bajamos el
+    nivel SOLO para estas conexiones; la verificación del certificado del
+    servidor sigue activa.
+    """
+
+    def _ctx(self):
+        ctx = create_urllib3_context()
+        ctx.set_ciphers("DEFAULT:@SECLEVEL=1")
+        return ctx
+
+    def init_poolmanager(self, *args, **kwargs):
+        kwargs["ssl_context"] = self._ctx()
+        return super().init_poolmanager(*args, **kwargs)
+
+    def proxy_manager_for(self, *args, **kwargs):
+        kwargs["ssl_context"] = self._ctx()
+        return super().proxy_manager_for(*args, **kwargs)
+
+
+def _session():
+    s = requests.Session()
+    s.mount("https://", _AfipSSLAdapter())
+    return s
 DATA_DIR = Path(__file__).parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
@@ -113,7 +145,10 @@ def get_auth(cuit, entorno, cert_path, key_path, service="wsfe"):
     tra = _login_ticket_xml(service)
     cms_b64 = _sign_tra(tra, cert_path, key_path)
 
-    client = Client(ENDPOINTS[entorno]["wsaa"], transport=Transport(timeout=30))
+    client = Client(
+        ENDPOINTS[entorno]["wsaa"],
+        transport=Transport(timeout=30, session=_session()),
+    )
     try:
         response = client.service.loginCms(in0=cms_b64)
     except Exception as e:  # zeep levanta Fault si el ticket es inválido/duplicado
@@ -140,7 +175,10 @@ def _parse_login_response(xml_text: str):
 
 
 def _wsfe_client(entorno: str) -> Client:
-    return Client(ENDPOINTS[entorno]["wsfe"], transport=Transport(timeout=30))
+    return Client(
+        ENDPOINTS[entorno]["wsfe"],
+        transport=Transport(timeout=30, session=_session()),
+    )
 
 
 def proximo_numero(client, auth, punto_venta, cbte_tipo=CBTE_TIPO_FACTURA_C):
