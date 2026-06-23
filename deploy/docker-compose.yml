@@ -1,0 +1,28 @@
+# Compose del facturador en el server `prod`. Vive en /aplicaciones/facturador/.
+# Aislado de la app de pedidos, pero enchufado a la red de Caddy (docker_default)
+# para que el reverse proxy lo enrute por su nombre de contenedor.
+services:
+  facturador:
+    build: ./src
+    image: facturador-arca:latest
+    container_name: facturador
+    # Config y secretos (CUIT, clave, FLASK_SECRET_KEY, rutas de cert).
+    env_file: ./secrets/.env
+    volumes:
+      - ./secrets/certs:/app/certs:ro   # certificados (solo lectura)
+      - ./data:/app/data                # base SQLite + cache del token (persistente)
+    expose:
+      - "5001"
+    networks:
+      - caddy
+    restart: unless-stopped             # arranca solo al reiniciar el server
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  caddy:
+    external: true
+    name: docker_default

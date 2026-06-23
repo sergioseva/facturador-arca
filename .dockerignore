@@ -1,0 +1,11 @@
+.git
+.venv
+venv
+data
+certs
+.env
+__pycache__
+*.pyc
+*.bak*
+deploy
+README.md
