@@ -1,12 +1,56 @@
 # Facturador ARCA 🧾
 
-Paginita web con una clave que te pide un monto y genera una **Factura C**
-(Monotributo, a Consumidor Final) en ARCA (ex-AFIP), hablando directo con los
-web services **WSAA** + **WSFEv1**. Sin servicios de terceros.
+Aplicación web mínima, protegida con una clave, para **emitir facturas
+electrónicas en ARCA (ex-AFIP)** y llevar el control de lo facturado.
+
+Pensada para **Monotributo → Factura C a Consumidor Final**: entrás, ponés el
+monto y genera la factura con su CAE. Habla **directo** con los web services de
+ARCA (**WSAA** + **WSFEv1**), sin servicios de terceros que intermedien tus
+credenciales.
 
 ```
 ingresás monto → WSAA (autentica con tu certificado) → WSFEv1 (pide el CAE) → factura
 ```
+
+## Qué hace
+
+- **Facturar** con un click: ingresás el monto (con formato argentino
+  `10.000.000,50` que se arma solo mientras tipeás) y opcionalmente la fecha
+  (hasta 10 días hacia atrás), y emite la **Factura C** con su número y CAE.
+- **Spinner** mientras espera la respuesta de ARCA, para que no parezca colgado.
+- **Historial de intentos** (SQLite): guarda **todas** las facturas, las
+  emitidas y las que fallaron, con el mensaje de error de ARCA.
+- **Control monotributo**: sincroniza tus comprobantes desde ARCA y te muestra
+  el **total facturado por mes** y el **acumulado móvil de los últimos 12 meses**
+  (el número que mira ARCA para la categoría).
+
+## Páginas
+
+| Ruta | Qué muestra |
+|------|-------------|
+| `/` | Formulario para emitir la factura (monto + fecha). |
+| `/historial` | Tabla de todos los intentos (emitidos y con error) + resumen. |
+| `/resumen` | Control monotributo: total por mes y acumulado 12 meses. |
+| `/login` `/logout` | Acceso con la clave. |
+
+## Estructura del proyecto
+
+```
+arca-facturador/
+├── app.py                # web app Flask (rutas, login, filtros)
+├── afip.py               # cliente WSAA + WSFEv1 (auth, emisión, consulta)
+├── db.py                 # persistencia en SQLite (data/facturas.db)
+├── generar_csr.sh        # helper para generar clave privada + CSR
+├── templates/            # login, index, historial, resumen
+├── certs/                # certificados y claves (gitignored)
+├── data/                 # base SQLite y cache del token (gitignored)
+├── requirements.txt
+└── .env                  # configuración y secretos (gitignored)
+```
+
+> 🔒 **Nada sensible se versiona.** El `.gitignore` excluye `.env`, los
+> certificados/claves de `certs/` y la base de `data/`. Lo único de ejemplo que
+> se sube es `.env.example`.
 
 ---
 
@@ -16,43 +60,46 @@ ingresás monto → WSAA (autentica con tu certificado) → WSFEv1 (pide el CAE)
 cd arca-facturador
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env        # después editá .env
+cp .env.example .env        # después editá .env (ver paso 3)
 ```
+
+> Requiere Python 3.10+ (probado en 3.14). `openssl` para generar el certificado.
 
 ---
 
 ## 2. Generar el certificado digital (lo hacés vos, una vez)
 
-ARCA no deja facturar por API sin un certificado a tu nombre. Hay que generar
-una clave privada + un pedido (CSR), subirlo a ARCA y **autorizar el servicio
-`wsfe`** (Factura Electrónica) para ese certificado.
+ARCA no deja facturar por API sin un certificado a tu nombre. El flujo es:
+generar una clave privada + un pedido (CSR), subir el CSR a ARCA para que te
+devuelva el certificado, y **autorizar el servicio `wsfe`** (Factura
+Electrónica) para ese certificado.
 
 ### 2.1 Generar clave privada y CSR
 
-Reemplazá `TU NOMBRE` y el CUIT por los tuyos (CUIT sin guiones):
+Hay un helper que te lo arma (te pregunta CUIT y nombre):
 
 ```bash
-# Clave privada
-openssl genrsa -out certs/homo.key 2048
-
-# Pedido de certificado (CSR)
-openssl req -new -key certs/homo.key \
-  -subj "/C=AR/O=TU NOMBRE/CN=facturador/serialNumber=CUIT 20123456789" \
-  -out certs/homo.csr
+./generar_csr.sh homo      # para homologación (pruebas)
+./generar_csr.sh prod      # para producción
 ```
+
+Deja `certs/<entorno>.key` (privada, **secreta**) y `certs/<entorno>.csr` (el
+pedido que vas a subir a ARCA), e imprime el CSR para copiar.
 
 > ⚠️ La clave privada (`.key`) es secreta: nunca la subas a git ni la compartas.
 > El `.gitignore` ya la excluye.
 
-### 2.2 — Entorno de HOMOLOGACIÓN (pruebas, empezamos acá)
+### 2.2 — Entorno de HOMOLOGACIÓN (pruebas, empezá acá)
 
 1. Entrá a **WSASS** (autogestión de homologación):
    https://wsass-homo.afip.gob.ar/wsass/portal/main.aspx
    (login con CUIT + clave fiscal).
-2. **"Adherir/Generar certificado"** → pegá el contenido de `certs/homo.csr`.
+2. **Crear certificado / Nuevo certificado** → pegá el contenido de
+   `certs/homo.csr`.
 3. Te devuelve el certificado → guardalo como `certs/homo.crt`.
-4. **"Autorizar Web Service"** → elegí el servicio **`wsfe`** y asociá tu
-   certificado. (Esto es lo que permite facturar.)
+4. **Crear autorización a servicio** → Servicio **`wsfe`**, representado = tu
+   CUIT, y asociá el certificado recién creado. *(Esto es lo que habilita
+   facturar.)*
 
 En `.env` dejá:
 ```
@@ -63,18 +110,19 @@ KEY_PATH=certs/homo.key
 
 ### 2.3 — Entorno de PRODUCCIÓN (cuando ya probaste y funciona)
 
-1. AFIP con clave fiscal → **"Administrador de Relaciones de Clave Fiscal"** →
+1. **Generá el CSR de producción**: `./generar_csr.sh prod`.
+2. AFIP con clave fiscal → **"Administrador de Relaciones de Clave Fiscal"** →
    adherí el servicio **"Administración de Certificados Digitales"**.
-2. En ese servicio → **"Agregar alias"** → subí un CSR **nuevo de producción**
-   (repetí el paso 2.1 generando `certs/prod.key` y `certs/prod.csr`).
-   Descargá el certificado como `certs/prod.crt`.
-3. Volvé a **"Administrador de Relaciones"** → **Nueva relación** → buscá el
+3. En ese servicio → **"Agregar alias"** → subí `certs/prod.csr`. Descargá el
+   certificado como `certs/prod.crt`.
+4. Volvé a **"Administrador de Relaciones"** → **Nueva relación** → buscá el
    servicio **"Facturación Electrónica (wsfe)"** → como representante elegí el
-   **certificado** que acabás de crear (su alias/DN). Esto autoriza el cert.
-4. En "Comprobantes en línea" de AFIP, **dá de alta tu punto de venta** para
-   **Web Services** (no sirve uno que ya uses para el facturador web manual).
-   Poné ese número en `PUNTO_VENTA`.
-5. En `.env`:
+   **certificado** que creaste (su alias/DN). Esto autoriza el cert.
+5. **Punto de venta para Web Services**: en AFIP → **"Administración de puntos
+   de venta y domicilios"** (o dentro de "Comprobantes en línea") → **Agregar
+   punto de venta** → sistema **"Factura Electrónica – Web Services"** (¡NO
+   "Comprobantes en línea"!). Anotá el número y ponelo en `PUNTO_VENTA`.
+6. En `.env`:
    ```
    ENTORNO=produccion
    CERT_PATH=certs/prod.crt
@@ -87,7 +135,7 @@ KEY_PATH=certs/homo.key
 
 ```
 APP_PASSWORD=...            # la clave para entrar a la página
-FLASK_SECRET_KEY=...        # string largo al azar
+FLASK_SECRET_KEY=...        # string largo al azar (ver abajo)
 CUIT=20123456789           # tu CUIT sin guiones
 PUNTO_VENTA=1              # el punto de venta habilitado para WS
 ENTORNO=homologacion       # o produccion
@@ -96,7 +144,7 @@ CERT_PATH=certs/homo.crt
 KEY_PATH=certs/homo.key
 ```
 
-Generá un secret al azar:
+Generá el `FLASK_SECRET_KEY` al azar:
 ```bash
 python3 -c "import secrets; print(secrets.token_hex(32))"
 ```
@@ -111,30 +159,53 @@ python app.py
 # abrí http://127.0.0.1:5001
 ```
 
-Ponés la clave, tipeás el monto, "Generar Factura C" → te muestra **número + CAE**.
-Cada factura emitida queda registrada en `data/facturas.json`.
+Entrás con la clave, tipeás el monto, **"Generar Factura C"** → te muestra
+**número + CAE**. Cada intento (emitido o con error) queda en
+`data/facturas.db` (SQLite).
+
+### Consultar la base a mano
+
+```bash
+sqlite3 data/facturas.db "SELECT numero, importe, cae, estado FROM facturas ORDER BY id DESC;"
+```
 
 ---
 
-## 5. Ponerla en producción (en `bot-prod`, detrás de Caddy)
+## 5. Ponerla en producción (detrás de Caddy)
 
-Igual que tus otros proyectos: gunicorn + un bloque en el Caddyfile.
+Mismo patrón que el resto de los proyectos: gunicorn + un bloque en el Caddyfile.
 
 ```bash
 pip install gunicorn
 gunicorn -w 1 -b 127.0.0.1:5001 app:app
 ```
 
-Caddy (reverse proxy con HTTPS automático):
 ```
 facturador.tudominio.com {
     reverse_proxy 127.0.0.1:5001
 }
 ```
 
-> Al ser facturación real, mantené el acceso restringido (clave fuerte, y si
-> querés, IP allowlist en Caddy). El reloj del server tiene que estar en hora
-> (WSAA rechaza tickets con el reloj desfasado): `timedatectl` con NTP activo.
+> - Usá **1 worker** (`-w 1`): el cache del token WSAA es un archivo local.
+> - Al ser facturación real, mantené el acceso restringido (clave fuerte y, si
+>   querés, IP allowlist en Caddy).
+> - El **reloj del server tiene que estar en hora** (WSAA rechaza tickets con el
+>   reloj desfasado): asegurate de tener NTP activo (`timedatectl`).
+
+---
+
+## Cómo funciona por dentro
+
+- **WSAA** (`afip.py`): arma un *login ticket*, lo firma como **CMS/PKCS#7** con
+  tu certificado (librería `cryptography`, sin shelling-out a openssl), y obtiene
+  un **Token + Sign** que valen ~12 hs. Se cachean en `data/ta_*.json` y se
+  renuevan solos.
+- **WSFEv1** (`afip.py`, vía `zeep`): pide el próximo número con
+  `FECompUltimoAutorizado`, emite con `FECAESolicitar` (Factura C, doc receptor
+  99 = Consumidor Final, condición IVA receptor 5 según RG 5616), y para el
+  control mensual consulta cada comprobante con `FECompConsultar`.
+- **SQLite** (`db.py`): tabla `facturas` (intentos: emitidos y con error) y
+  `arca_comprobantes` (espejo de lo leído de ARCA para los totales).
 
 ---
 
@@ -142,16 +213,20 @@ facturador.tudominio.com {
 
 - **Factura C a Consumidor Final**: ARCA exige identificar al receptor (CUIT/DNI)
   cuando el total supera cierto umbral. Por debajo va como Consumidor Final
-  (doc 99). Si facturás montos altos a una persona, habría que agregar el campo
-  del receptor — avisame y lo sumo.
-- El **token de WSAA dura ~12hs** y se cachea en `data/`. No hace falta renovar
-  a mano.
+  (doc 99). Si facturás montos altos a una persona, hay que agregar el campo del
+  receptor.
+- **Control monotributo**: los totales se leen directo de ARCA (incluye facturas
+  hechas fuera de esta app), pero cubren **este punto de venta + Factura C**. El
+  límite del monotributo se calcula sobre **toda** tu facturación (todos los PV y
+  tipos de comprobante); si facturás por otros lados, sumalos aparte. El tope de
+  categoría **no está hardcodeado** porque ARCA lo actualiza cada tanto:
+  comparalo contra la tabla vigente.
+- **Fecha atrasada**: se puede elegir hasta 10 días hacia atrás (lo que tolera
+  ARCA). Los comprobantes deben ir en **orden cronológico**: la fecha no puede
+  ser anterior a la de la última factura ya autorizada en ese punto de venta — si
+  lo es, ARCA la rechaza y el error aparece en pantalla y en el historial.
+- **Concepto Servicios** (2/3) manda fecha de período y vencimiento = la fecha
+  elegida. Para períodos distintos, se puede parametrizar.
+- El **token de WSAA dura ~12 hs** y se cachea; no hace falta renovarlo a mano.
 - Probá **siempre primero en homologación**. Las facturas de producción son
   reales y válidas fiscalmente.
-- Concepto **Servicios** (2/3) manda fecha de período y vencimiento = la fecha
-  elegida. Si facturás por períodos distintos, se puede parametrizar.
-- **Fecha atrasada**: la página deja elegir la fecha (hasta 10 días hacia atrás,
-  que es lo que tolera ARCA). Ojo: los comprobantes deben ir en **orden
-  cronológico**, así que la fecha no puede ser anterior a la de la última
-  factura ya autorizada en ese punto de venta — si lo es, ARCA la rechaza y vas
-  a ver el error en pantalla.
