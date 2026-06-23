@@ -346,6 +346,72 @@ def acumulado_desde_mis(entorno, fecha_desde):
         return {"total": row["total"], "cantidad": row["cant"]}
 
 
+def resumen_detallado(entorno, fecha_movil):
+    """
+    Unifica las dos fuentes para el control de monotributo:
+      - 'facturador': facturas emitidas por esta app (tabla facturas).
+      - 'importada':  comprobantes del CSV de Mis Comprobantes (otros PV, etc.).
+    Evita el doble conteo: si una factura del CSV coincide con una emitida por la
+    app (mismo PV + número), se cuenta una sola vez como 'facturador'.
+    Devuelve los comprobantes agrupados por mes (con su detalle) y el acumulado
+    móvil de 12 meses.
+    """
+    init_db()
+    with _conn() as conn:
+        app_rows = conn.execute(
+            "SELECT punto_venta, numero, fecha, importe FROM facturas "
+            "WHERE entorno=? AND estado='emitida'",
+            (entorno,),
+        ).fetchall()
+        mis_rows = conn.execute(
+            "SELECT punto_venta, numero, fecha, importe, tipo FROM mis_comprobantes "
+            "WHERE entorno=?",
+            (entorno,),
+        ).fetchall()
+
+    app_keys = {(r["punto_venta"], r["numero"]) for r in app_rows}
+    comprobantes = [
+        {
+            "fecha": r["fecha"], "tipo": "Factura C", "punto_venta": r["punto_venta"],
+            "numero": r["numero"], "importe": r["importe"], "origen": "facturador",
+        }
+        for r in app_rows
+    ]
+    for r in mis_rows:
+        es_factura = "factura" in _norm(r["tipo"])
+        if es_factura and (r["punto_venta"], r["numero"]) in app_keys:
+            continue  # ya contada como 'facturador'
+        comprobantes.append(
+            {
+                "fecha": r["fecha"], "tipo": r["tipo"], "punto_venta": r["punto_venta"],
+                "numero": r["numero"], "importe": r["importe"], "origen": "importada",
+            }
+        )
+
+    # Agrupar por mes (yyyymm)
+    meses = {}
+    for c in comprobantes:
+        m = meses.setdefault(
+            c["fecha"][:6],
+            {"mes": c["fecha"][:6], "total": 0.0, "cantidad": 0,
+             "n_facturador": 0, "n_importada": 0, "comprobantes": []},
+        )
+        m["total"] += c["importe"]
+        m["cantidad"] += 1
+        m["n_facturador" if c["origen"] == "facturador" else "n_importada"] += 1
+        m["comprobantes"].append(c)
+
+    for m in meses.values():
+        m["comprobantes"].sort(key=lambda x: (x["fecha"], x["punto_venta"], x["numero"]))
+
+    meses_ordenados = [meses[k] for k in sorted(meses, reverse=True)]
+    movil = [c for c in comprobantes if c["fecha"] >= fecha_movil]
+    return {
+        "meses": meses_ordenados,
+        "movil": {"total": sum(c["importe"] for c in movil), "cantidad": len(movil)},
+    }
+
+
 def info_mis(entorno):
     """Rango de fechas y cantidad de comprobantes importados (o None si no hay)."""
     init_db()

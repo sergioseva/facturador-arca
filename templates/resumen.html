@@ -16,6 +16,21 @@
     th, td { padding: .6rem .5rem; border-bottom: 1px solid #3334; }
     th { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: #888; text-align: left; }
     td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    details { border-bottom: 1px solid #3334; }
+    summary { display: flex; align-items: center; gap: .8rem; padding: .7rem .3rem; cursor: pointer; list-style: none; }
+    summary::-webkit-details-marker { display: none; }
+    summary::before { content: "▸"; color: #888; transition: transform .15s; }
+    details[open] summary::before { transform: rotate(90deg); }
+    .mes-nombre { font-weight: 600; min-width: 6rem; }
+    .mes-cant { color: #888; font-size: .85rem; }
+    .mes-total { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 600; }
+    table.detalle { margin: .2rem 0 1rem 1.2rem; width: calc(100% - 1.2rem); font-size: .85rem; }
+    table.detalle th { font-size: .7rem; }
+    .badge { font-size: .68rem; padding: .05rem .45rem; border-radius: 999px; font-weight: 600; }
+    .badge.fact { background: #c7d2fe; color: #3730a3; }
+    .badge.imp  { background: #e5e7eb; color: #374151; }
+    .leyenda { display: flex; gap: 1rem; font-size: .8rem; color: #888; margin: .5rem 0 0; }
+    .origen-resumen { color: #888; font-size: .78rem; margin: -.5rem 0 .8rem 1.2rem; }
     .sync { display: flex; align-items: center; gap: .8rem; margin: 1rem 0; flex-wrap: wrap; }
     button { padding: .6rem 1rem; font-size: .95rem; border-radius: 8px; border: none; background: #2563eb; color: #fff; cursor: pointer; font-weight: 600; }
     button:disabled { opacity: .8; cursor: progress; }
@@ -53,22 +68,45 @@
   </div>
 
   {% if meses %}
-  <table>
-    <thead>
-      <tr><th>Mes</th><th class="num">Comprobantes</th><th class="num">Total facturado</th></tr>
-    </thead>
-    <tbody>
-      {% for m in meses %}
-      <tr>
-        <td>{{ m.mes|mes }}</td>
-        <td class="num">{{ m.cant }}</td>
-        <td class="num">$ {{ m.total|ars }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <p class="leyenda">
+    <span><span class="badge fact">facturador</span> generada por esta app</span>
+    <span><span class="badge imp">importada</span> del CSV de Mis Comprobantes</span>
+  </p>
+  <p style="color:#888;font-size:.8rem;margin:.3rem 0 1rem">Tocá un mes para ver el detalle ↓</p>
+
+  {% for m in meses %}
+  <details>
+    <summary>
+      <span class="mes-nombre">{{ m.mes|mes }}</span>
+      <span class="mes-cant">{{ m.cantidad }} comp.</span>
+      <span class="mes-total">$ {{ m.total|ars }}</span>
+    </summary>
+    <table class="detalle">
+      <thead>
+        <tr><th>Fecha</th><th>Comprobante</th><th>Origen</th><th class="num">Importe</th></tr>
+      </thead>
+      <tbody>
+        {% for c in m.comprobantes %}
+        <tr>
+          <td>{{ c.fecha[6:8] }}/{{ c.fecha[4:6] }}/{{ c.fecha[0:4] }}</td>
+          <td>{{ c.tipo }} {{ '%04d'|format(c.punto_venta) }}-{{ '%08d'|format(c.numero) }}</td>
+          <td>
+            {% if c.origen == 'facturador' %}
+              <span class="badge fact">facturador</span>
+            {% else %}
+              <span class="badge imp">importada</span>
+            {% endif %}
+          </td>
+          <td class="num">$ {{ c.importe|ars }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="origen-resumen">{{ m.n_facturador }} del facturador · {{ m.n_importada }} importada(s)</p>
+  </details>
+  {% endfor %}
   {% else %}
-  <p style="color:#888;margin-top:1.5rem">Todavía no importaste ningún CSV. Seguí los pasos de abajo.</p>
+  <p style="color:#888;margin-top:1.5rem">Todavía no hay comprobantes. Generá facturas o importá el CSV de Mis Comprobantes.</p>
   {% endif %}
 
   <div class="nota">

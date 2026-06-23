@@ -164,10 +164,11 @@ def resumen():
 
     # Acumulado móvil de los últimos 12 meses (lo que mira ARCA para la categoría).
     hace_12 = (datetime.now(afip.AR_TZ) - timedelta(days=365)).strftime("%Y%m%d")
+    detalle = db.resumen_detallado(ENTORNO, hace_12)
     return render_template(
         "resumen.html",
-        meses=db.resumen_mensual_mis(ENTORNO),
-        movil12=db.acumulado_desde_mis(ENTORNO, hace_12),
+        meses=detalle["meses"],
+        movil12=detalle["movil"],
         info=db.info_mis(ENTORNO),
         entorno=ENTORNO,
         msg=msg,
