@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Control monotributo — Facturador ARCA</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; max-width: 620px; margin: 6vh auto; padding: 0 1rem; }
+    h1 { font-size: 1.3rem; }
+    a.volver { font-size: .9rem; }
+    .destacado { background: #1e3a8a; color: #eff6ff; padding: 1.2rem 1.4rem; border-radius: 14px; margin: 1.2rem 0; }
+    .destacado small { color: #bfdbfe; }
+    .destacado b { font-size: 2rem; display: block; margin-top: .2rem; font-variant-numeric: tabular-nums; }
+    table { width: 100%; border-collapse: collapse; font-size: .95rem; margin-top: 1rem; }
+    th, td { padding: .6rem .5rem; border-bottom: 1px solid #3334; }
+    th { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: #888; text-align: left; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .sync { display: flex; align-items: center; gap: .8rem; margin: 1rem 0; flex-wrap: wrap; }
+    button { padding: .6rem 1rem; font-size: .95rem; border-radius: 8px; border: none; background: #2563eb; color: #fff; cursor: pointer; font-weight: 600; }
+    button:disabled { opacity: .8; cursor: progress; }
+    .ok { background: #dcfce7; color: #166534; padding: .7rem 1rem; border-radius: 8px; }
+    .err { background: #fee2e2; color: #991b1b; padding: .7rem 1rem; border-radius: 8px; white-space: pre-wrap; }
+    .nota { color: #888; font-size: .8rem; margin-top: 1.5rem; }
+    .spinner { display:inline-block; width:1.1em; height:1.1em; vertical-align:-.2em; margin-right:.5em;
+               border:2.5px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:girar .7s linear infinite; }
+    @keyframes girar { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <a class="volver" href="{{ url_for('index') }}">← Volver a facturar</a>
+  <h1>📊 Control monotributo</h1>
+  <p style="color:#888;font-size:.9rem">Pto. venta {{ punto_venta }} · Factura C · entorno {{ entorno }}</p>
+
+  <form method="post" class="sync" id="form-sync">
+    <button type="submit" id="btn-sync">Actualizar desde ARCA</button>
+    {% if sync_msg %}<span class="ok">{{ sync_msg }}</span>{% endif %}
+    {% if sync_error %}<span class="err">❌ {{ sync_error }}</span>{% endif %}
+  </form>
+
+  <div class="destacado">
+    <small>Acumulado últimos 12 meses (móvil) — {{ movil12.cantidad }} comprobantes</small>
+    <b>$ {{ movil12.total|ars }}</b>
+  </div>
+
+  {% if meses %}
+  <table>
+    <thead>
+      <tr><th>Mes</th><th class="num">Facturas</th><th class="num">Total facturado</th></tr>
+    </thead>
+    <tbody>
+      {% for m in meses %}
+      <tr>
+        <td>{{ m.mes|mes }}</td>
+        <td class="num">{{ m.cant }}</td>
+        <td class="num">$ {{ m.total|ars }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:#888;margin-top:1.5rem">Todavía no sincronizaste. Tocá <b>"Actualizar desde ARCA"</b> para traer tus comprobantes.</p>
+  {% endif %}
+
+  <p class="nota">
+    Los totales se leen directo de ARCA (incluye facturas hechas fuera de esta app).
+    Cubre este punto de venta y Factura C. El acumulado de 12 meses es el período
+    móvil que usa ARCA para la categoría — actualizá los topes según la tabla vigente.
+  </p>
+
+  <script>
+    document.getElementById('form-sync').addEventListener('submit', () => {
+      const b = document.getElementById('btn-sync');
+      b.disabled = true;
+      b.innerHTML = '<span class="spinner"></span>Consultando ARCA…';
+    });
+  </script>
+</body>
+</html>

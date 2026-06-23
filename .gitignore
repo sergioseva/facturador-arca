@@ -1,0 +1,20 @@
+# Secretos y datos — NUNCA subir
+.env
+certs/*.key
+certs/*.crt
+certs/*.csr
+certs/*.pem
+
+# Datos locales (facturas, cache del token, etc.)
+data/*.json
+data/*.xml
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+!.gitkeep
