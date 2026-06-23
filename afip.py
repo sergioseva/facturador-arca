@@ -265,10 +265,12 @@ def emitir_factura_c(
     importe,
     concepto=2,
     fecha=None,
+    actividad=None,
 ):
     """
     Emite una Factura C a Consumidor Final por `importe` (total).
     `fecha` opcional ('AAAA-MM-DD' o None = hoy) para facturar un día atrasado.
+    `actividad` opcional (código, ej. 476110) para clasificar el comprobante.
     Devuelve un dict con el resultado (CAE, vencimiento, número, etc.).
     """
     importe = round(float(importe), 2)
@@ -305,6 +307,10 @@ def emitir_factura_c(
         detalle["FchServDesde"] = hoy
         detalle["FchServHasta"] = hoy
         detalle["FchVtoPago"] = hoy
+
+    # Actividad asociada (ej. 476110 venta de libros), opcional.
+    if actividad:
+        detalle["Actividades"] = {"Actividad": [{"Id": int(actividad)}]}
 
     pedido = {
         "FeCabReq": {

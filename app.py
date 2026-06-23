@@ -35,6 +35,7 @@ CUIT = os.environ["CUIT"]
 PUNTO_VENTA = int(os.environ["PUNTO_VENTA"])
 ENTORNO = os.environ.get("ENTORNO", "homologacion")
 CONCEPTO = int(os.environ.get("CONCEPTO", "2"))
+ACTIVIDAD = os.environ.get("ACTIVIDAD", "").strip() or None
 CERT_PATH = os.environ["CERT_PATH"]
 KEY_PATH = os.environ["KEY_PATH"]
 
@@ -108,6 +109,7 @@ def index():
                 importe=importe,
                 concepto=CONCEPTO,
                 fecha=fecha,
+                actividad=ACTIVIDAD,
             )
         except (afip.AfipError, ValueError) as e:
             error = str(e)
