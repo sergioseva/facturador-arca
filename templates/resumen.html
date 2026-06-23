@@ -12,6 +12,16 @@
     .destacado { background: #1e3a8a; color: #eff6ff; padding: 1.2rem 1.4rem; border-radius: 14px; margin: 1.2rem 0; }
     .destacado small { color: #bfdbfe; }
     .destacado b { font-size: 2rem; display: block; margin-top: .2rem; font-variant-numeric: tabular-nums; }
+    .cat-form { margin: 1.2rem 0 .4rem; display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
+    .cat-form label { font-weight: 600; font-size: .9rem; }
+    .cat-form select { padding: .5rem; border-radius: 8px; border: 1px solid #888; font-size: .95rem; background: inherit; color: inherit; }
+    .barra { height: 12px; background: rgba(255,255,255,.18); border-radius: 999px; overflow: hidden; margin-top: .8rem; }
+    .barra-fill { height: 100%; border-radius: 999px; transition: width .4s; }
+    .barra-fill.verde { background: #22c55e; }
+    .barra-fill.amarillo { background: #f59e0b; }
+    .barra-fill.rojo { background: #ef4444; }
+    .cat-msg { margin-top: .7rem; font-size: .92rem; line-height: 1.45; }
+    .nota-cat { color: #888; font-size: .78rem; margin: .3rem 0 0; }
     table { width: 100%; border-collapse: collapse; font-size: .95rem; margin-top: 1rem; }
     th, td { padding: .6rem .5rem; border-bottom: 1px solid #3334; }
     th { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: #888; text-align: left; }
@@ -62,10 +72,43 @@
   </p>
   {% endif %}
 
+  <form method="post" class="cat-form">
+    <label for="categoria">Mi categoría de monotributo:</label>
+    <select name="categoria" id="categoria" onchange="this.form.submit()">
+      <option value="">— elegir —</option>
+      {% for c, t in topes.items() %}
+      <option value="{{ c }}" {{ 'selected' if c == categoria }}>{{ c }} — hasta $ {{ t|ars }}</option>
+      {% endfor %}
+    </select>
+    <noscript><button type="submit">Guardar</button></noscript>
+  </form>
+
   <div class="destacado">
     <small>Acumulado últimos 12 meses (móvil) — {{ movil12.cantidad }} comprobantes</small>
     <b>$ {{ movil12.total|ars }}</b>
+    {% if cat_info %}
+    <div class="barra">
+      <div class="barra-fill {{ 'rojo' if cat_info.excedido else ('amarillo' if cat_info.pct_real >= 80 else 'verde') }}"
+           style="width: {{ cat_info.pct }}%"></div>
+    </div>
+    <div class="cat-msg">
+      {% if cat_info.excedido %}
+        ⚠️ Te pasaste del tope de la <b>categoría {{ cat_info.categoria }}</b>
+        ($ {{ cat_info.tope|ars }}) por <b>$ {{ (-cat_info.restante)|ars }}</b>.
+        {% if cat_info.sugerida %}
+          Con esta facturación te corresponde <b>categoría {{ cat_info.sugerida }}</b>.
+        {% else %}
+          Estás por encima del tope máximo del monotributo (cat. K).
+        {% endif %}
+      {% else %}
+        Tope de la <b>categoría {{ cat_info.categoria }}</b>: $ {{ cat_info.tope|ars }}.
+        Te faltan <b>$ {{ cat_info.restante|ars }}</b> para pasarte
+        ({{ cat_info.pct_real|round(1) }}% usado).
+      {% endif %}
+    </div>
+    {% endif %}
   </div>
+  {% if cat_info %}<p class="nota-cat">Topes de ingresos brutos vigentes desde {{ vigente_desde }} (ARCA).</p>{% endif %}
 
   {% if meses %}
   <p class="leyenda">

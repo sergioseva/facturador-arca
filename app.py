@@ -20,6 +20,7 @@ from flask import (
 )
 
 import afip
+import categorias
 import db
 
 load_dotenv()
@@ -146,25 +147,50 @@ def resumen():
     msg = None
     error = None
     if request.method == "POST":
-        archivo = request.files.get("csv")
-        if not archivo or not archivo.filename:
-            error = "Elegí el archivo CSV exportado de Mis Comprobantes."
+        if "categoria" in request.form:
+            cat = request.form["categoria"].strip().upper()
+            if cat in categorias.TOPES or cat == "":
+                db.set_config("categoria", cat)
+                msg = f"Categoría {cat} guardada." if cat else "Categoría desactivada."
+            else:
+                error = "Categoría inválida."
         else:
-            try:
-                r = db.importar_mis_comprobantes(archivo.read(), ENTORNO)
-                if r.get("error"):
-                    error = r["error"]
-                else:
-                    rango = ""
-                    if r["desde"]:
-                        rango = f" (del {r['desde'][6:8]}/{r['desde'][4:6]}/{r['desde'][0:4]} al {r['hasta'][6:8]}/{r['hasta'][4:6]}/{r['hasta'][0:4]})"
-                    msg = f"Importados {r['importados']} comprobantes{rango}."
-            except Exception as e:  # noqa: BLE001
-                error = f"No pude procesar el CSV: {e}"
+            archivo = request.files.get("csv")
+            if not archivo or not archivo.filename:
+                error = "Elegí el archivo CSV exportado de Mis Comprobantes."
+            else:
+                try:
+                    r = db.importar_mis_comprobantes(archivo.read(), ENTORNO)
+                    if r.get("error"):
+                        error = r["error"]
+                    else:
+                        rango = ""
+                        if r["desde"]:
+                            rango = f" (del {r['desde'][6:8]}/{r['desde'][4:6]}/{r['desde'][0:4]} al {r['hasta'][6:8]}/{r['hasta'][4:6]}/{r['hasta'][0:4]})"
+                        msg = f"Importados {r['importados']} comprobantes{rango}."
+                except Exception as e:  # noqa: BLE001
+                    error = f"No pude procesar el CSV: {e}"
 
     # Acumulado móvil de los últimos 12 meses (lo que mira ARCA para la categoría).
     hace_12 = (datetime.now(afip.AR_TZ) - timedelta(days=365)).strftime("%Y%m%d")
     detalle = db.resumen_detallado(ENTORNO, hace_12)
+
+    # Cálculo de la categoría: tope, cuánto falta, porcentaje, sugerida.
+    cat = db.get_config("categoria", "")
+    total = detalle["movil"]["total"]
+    cat_info = None
+    if cat in categorias.TOPES:
+        tope = categorias.TOPES[cat]
+        cat_info = {
+            "categoria": cat,
+            "tope": tope,
+            "restante": tope - total,
+            "excedido": total > tope,
+            "pct": min(total / tope * 100, 100) if tope else 0,
+            "pct_real": (total / tope * 100) if tope else 0,
+            "sugerida": categorias.categoria_para(total),
+        }
+
     return render_template(
         "resumen.html",
         meses=detalle["meses"],
@@ -173,6 +199,10 @@ def resumen():
         entorno=ENTORNO,
         msg=msg,
         error=error,
+        categoria=cat,
+        cat_info=cat_info,
+        topes=categorias.TOPES,
+        vigente_desde=categorias.VIGENTE_DESDE,
     )
 
 

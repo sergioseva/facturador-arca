@@ -66,10 +66,36 @@ CREATE TABLE IF NOT EXISTS mis_comprobantes (
 """
 
 
+# Preferencias de la app (ej. la categoría de monotributo elegida).
+_SCHEMA_CONFIG = """
+CREATE TABLE IF NOT EXISTS config (
+    clave TEXT PRIMARY KEY,
+    valor TEXT
+)
+"""
+
+
 def _conn():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def get_config(clave, default=None):
+    init_db()
+    with _conn() as conn:
+        row = conn.execute("SELECT valor FROM config WHERE clave=?", (clave,)).fetchone()
+        return row["valor"] if row else default
+
+
+def set_config(clave, valor):
+    init_db()
+    with _conn() as conn:
+        conn.execute(
+            "INSERT INTO config (clave, valor) VALUES (?, ?) "
+            "ON CONFLICT(clave) DO UPDATE SET valor=excluded.valor",
+            (clave, valor),
+        )
 
 
 def _norm(s):
@@ -135,6 +161,7 @@ def init_db():
             conn.execute(_SCHEMA)
         conn.execute(_SCHEMA_ARCA)
         conn.execute(_SCHEMA_MIS)
+        conn.execute(_SCHEMA_CONFIG)
 
 
 def guardar(resultado: dict) -> int:
