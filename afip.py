@@ -126,16 +126,20 @@ def _sign_tra(tra_xml: bytes, cert_path: str, key_path: str) -> str:
     return base64.b64encode(cms).decode("ascii")
 
 
-def _cache_path(cuit: str, entorno: str, service: str) -> Path:
-    return DATA_DIR / f"ta_{entorno}_{service}_{cuit}.json"
+def _cache_path(entorno: str, service: str) -> Path:
+    # El TA (Token+Sign) es del certificado de la plataforma para ese servicio;
+    # NO depende del CUIT representado. Un solo TA sirve para todos los tenants.
+    return DATA_DIR / f"ta_{entorno}_{service}.json"
 
 
 def get_auth(cuit, entorno, cert_path, key_path, service="wsfe"):
     """
     Devuelve {'Token','Sign','Cuit'} listo para mandar a WSFE.
-    Reutiliza el ticket cacheado en disco mientras siga vigente.
+    Token+Sign vienen del certificado de la plataforma (cacheados por
+    entorno+servicio, compartidos entre tenants); `Cuit` es el representado y
+    varía por llamada (modelo de delegación / computador fiscal).
     """
-    cache = _cache_path(cuit, entorno, service)
+    cache = _cache_path(entorno, service)
     if cache.exists():
         ta = json.loads(cache.read_text())
         # Renovamos con 10 min de margen antes de que expire.
@@ -190,6 +194,23 @@ def proximo_numero(client, auth, punto_venta, cbte_tipo=CBTE_TIPO_FACTURA_C):
     return int(resp.CbteNro) + 1
 
 
+def verificar_delegacion(cuit, entorno, cert_path, key_path, punto_venta,
+                         cbte_tipo=CBTE_TIPO_FACTURA_C):
+    """
+    Chequea (sin emitir nada) que el tenant autorizó el computador fiscal de la
+    plataforma para WSFE: pide el último comprobante autorizado en su PV. Si la
+    delegación o el punto de venta no están bien, ARCA devuelve un error que se
+    propaga como AfipError. Devuelve {'ultimo': int} si todo está OK.
+    """
+    auth = get_auth(cuit, entorno, cert_path, key_path, service="wsfe")
+    client = _wsfe_client(entorno)
+    resp = client.service.FECompUltimoAutorizado(
+        Auth=auth, PtoVta=int(punto_venta), CbteTipo=cbte_tipo
+    )
+    _raise_on_errors(getattr(resp, "Errors", None))
+    return {"ultimo": int(resp.CbteNro)}
+
+
 def _normalizar_fecha(fecha):
     """
     Devuelve la fecha del comprobante en formato yyyymmdd.
@@ -222,11 +243,12 @@ def _normalizar_fecha(fecha):
 
 
 def sincronizar_comprobantes(
-    cuit, entorno, cert_path, key_path, punto_venta, cbte_tipo=CBTE_TIPO_FACTURA_C
+    user_id, cuit, entorno, cert_path, key_path, punto_venta,
+    cbte_tipo=CBTE_TIPO_FACTURA_C
 ):
     """
     Lee de ARCA los comprobantes que falten en la base local (incremental) y
-    los guarda. Devuelve {'ultimo', 'nuevos'}.
+    los guarda para `user_id`. Devuelve {'ultimo', 'nuevos'}.
     """
     import db
 
@@ -239,7 +261,7 @@ def sincronizar_comprobantes(
     _raise_on_errors(getattr(ult, "Errors", None))
     ultimo = int(ult.CbteNro)
 
-    ya_tengo = db.max_numero_arca(entorno, int(punto_venta), cbte_tipo)
+    ya_tengo = db.max_numero_arca(user_id, entorno, int(punto_venta), cbte_tipo)
     filas = []
     for n in range(ya_tengo + 1, ultimo + 1):
         r = client.service.FECompConsultar(
@@ -252,7 +274,7 @@ def sincronizar_comprobantes(
             (entorno, int(punto_venta), cbte_tipo, n, str(d.CbteFch), float(d.ImpTotal))
         )
 
-    db.guardar_comprobantes_arca(filas)
+    db.guardar_comprobantes_arca(user_id, filas)
     return {"ultimo": ultimo, "nuevos": len(filas)}
 
 
@@ -343,7 +365,7 @@ def emitir_factura_c(
         "emitido_en": datetime.now(AR_TZ).isoformat(),
         "observaciones": _format_observaciones(getattr(det, "Observaciones", None)),
     }
-    _registrar(resultado)
+    # La persistencia la hace la ruta (con user_id); afip.py es agnóstico de usuario.
     return resultado
 
 
@@ -367,11 +389,3 @@ def _format_observaciones(observaciones):
     if not items:
         return ""
     return "Observaciones: " + " | ".join(f"[{o.Code}] {o.Msg}" for o in items)
-
-
-def _registrar(resultado):
-    """Guarda cada factura emitida en SQLite (data/facturas.db)."""
-    import db
-
-    db.init_db()
-    db.guardar(resultado)

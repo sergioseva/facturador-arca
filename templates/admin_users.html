@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Admin · Usuarios — Facturador ARCA{% endblock %}
+{% block style %}
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; margin-top: 1rem; }
+  th, td { padding: .55rem .5rem; text-align: left; border-bottom: 1px solid #3334; }
+  th { font-size: .72rem; text-transform: uppercase; color: #888; }
+  form.inline { display: inline; }
+  .crear { display: grid; grid-template-columns: 1fr 1fr auto auto; gap: .6rem; align-items: end; margin: 1rem 0; }
+  @media (max-width: 560px) { .crear { grid-template-columns: 1fr; } }
+{% endblock %}
+{% block content %}
+  <h1>👤 Usuarios</h1>
+  {% if msg %}<div class="ok" style="margin:1rem 0">{{ msg }}</div>{% endif %}
+  {% if error %}<div class="error" style="margin:1rem 0">❌ {{ error }}</div>{% endif %}
+
+  <h3>Invitar usuario</h3>
+  <form method="post" class="crear">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="accion" value="crear">
+    <div><label for="email">Email</label><input type="email" id="email" name="email" required></div>
+    <div><label for="password">Clave temporal (mín. 8)</label><input type="text" id="password" name="password" required></div>
+    <div><label for="role">Rol</label>
+      <select name="role" id="role"><option value="user">user</option><option value="admin">admin</option></select>
+    </div>
+    <button type="submit">Crear</button>
+  </form>
+  <p class="muted">El usuario entra con esa clave y la cambia desde "Mi cuenta".</p>
+
+  <table>
+    <thead><tr><th>ID</th><th>Email</th><th>Rol</th><th>Estado</th><th>Alta</th><th></th></tr></thead>
+    <tbody>
+      {% for u in usuarios %}
+      <tr>
+        <td>{{ u.id }}</td>
+        <td>{{ u.email }}</td>
+        <td>{{ u.role }}</td>
+        <td>{% if u.activo %}<span class="badge ok" style="background:#bbf7d0;color:#166534">activo</span>{% else %}<span class="badge err" style="background:#fecaca;color:#991b1b">inactivo</span>{% endif %}</td>
+        <td class="muted">{{ u.created_at[0:10] }}</td>
+        <td>
+          {% if u.id != g.user.id %}
+          <form method="post" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="accion" value="toggle">
+            <input type="hidden" name="user_id" value="{{ u.id }}">
+            <button type="submit" class="link-btn" style="background:none;border:none;color:#60a5fa;cursor:pointer;text-decoration:underline">{{ 'desactivar' if u.activo else 'activar' }}</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

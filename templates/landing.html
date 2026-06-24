@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Facturador ARCA — Factura C automática para monotributistas{% endblock %}
+{% block style %}
+  .hero { text-align: center; padding: 8vh 0 4vh; }
+  .hero h1 { font-size: 2rem; margin-bottom: .5rem; }
+  .hero p.sub { font-size: 1.1rem; color: #888; max-width: 520px; margin: 0 auto 2rem; }
+  .features { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin: 2rem 0; }
+  .feature { padding: 1.2rem; border: 1px solid #8884; border-radius: 12px; }
+  .feature h3 { margin: 0 0 .4rem; font-size: 1rem; }
+  .feature p { margin: 0; color: #888; font-size: .9rem; }
+{% endblock %}
+{% block content %}
+<div class="hero">
+  <h1>🧾 Facturá tu monotributo en un click</h1>
+  <p class="sub">Emití tus Facturas C en ARCA al instante, llevá el control de tu
+    categoría y no te pases de tope. Sin planillas, sin entrar al facturador de AFIP.</p>
+  <a class="btn" href="{{ url_for('login') }}">Ingresar</a>
+</div>
+
+<div class="features">
+  <div class="feature"><h3>⚡ Factura C al instante</h3><p>Ponés el monto y listo: número y CAE en segundos, directo desde ARCA.</p></div>
+  <div class="feature"><h3>📊 Control de categoría</h3><p>Acumulado móvil de 12 meses y aviso de cuánto te falta para pasarte.</p></div>
+  <div class="feature"><h3>🗂️ Historial completo</h3><p>Todas tus facturas registradas, emitidas y con error, siempre a mano.</p></div>
+  <div class="feature"><h3>🔒 Sin compartir tu clave</h3><p>Usás la delegación de ARCA: nos autorizás sin entregarnos tu certificado.</p></div>
+</div>
+
+<p class="muted" style="text-align:center">Acceso por invitación. ¿Querés probarlo? Escribinos.</p>
+{% endblock %}

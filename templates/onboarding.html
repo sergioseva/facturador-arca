@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Configurar mi facturación — ARCA{% endblock %}
+{% block style %}
+  ol.pasos { line-height: 1.6; padding-left: 1.2rem; }
+  ol.pasos li { margin-bottom: .6rem; }
+  .destacado-cuit { background: #1f2937; color: #e5e7eb; padding: .6rem 1rem; border-radius: 8px; display: inline-block; font-variant-numeric: tabular-nums; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+  @media (max-width: 500px) { .grid2 { grid-template-columns: 1fr; } }
+  .error { margin: 1rem 0; }
+{% endblock %}
+{% block content %}
+  <h1>Conectá tu cuenta con ARCA</h1>
+  <p class="muted">Una sola vez. Autorizás a la plataforma a facturar en tu nombre — sin entregarnos tu certificado ni tu clave fiscal.</p>
+
+  {% if error %}<div class="error">❌ {{ error }}</div>{% endif %}
+
+  <h3>1. Autorizá el computador fiscal de la plataforma</h3>
+  <ol class="pasos">
+    <li>Entrá a AFIP/ARCA con tu clave fiscal → <b>Administrador de Relaciones de Clave Fiscal</b>.</li>
+    <li><b>Nueva Relación</b> → Servicio → buscá <b>Facturación Electrónica (WSFE)</b>.</li>
+    <li>Como <b>Representante</b> elegí el computador fiscal de la plataforma:
+      {% if platform_cuit %}<br><span class="destacado-cuit">CUIT {{ platform_cuit }}{% if platform_alias %} · alias {{ platform_alias }}{% endif %}</span>{% else %}<i>(te lo pasamos por separado)</i>{% endif %}
+    </li>
+    <li>Confirmá. Esto es lo que nos habilita a emitir tus comprobantes.</li>
+  </ol>
+
+  <h3>2. Creá un punto de venta Web Service</h3>
+  <ol class="pasos">
+    <li>ARCA → <b>Administración de puntos de venta y domicilios</b> → <b>Alta</b>.</li>
+    <li>Sistema: <b>Factura Electrónica – Web Services</b> (¡no "Comprobantes en línea"!).</li>
+    <li>Anotá el número que te asigna.</li>
+  </ol>
+
+  <h3>3. Cargá tus datos y verificá</h3>
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="grid2">
+      <div>
+        <label for="cuit">Tu CUIT (sin guiones)</label>
+        <input type="text" id="cuit" name="cuit" inputmode="numeric" value="{{ cfg.cuit or '' }}" required>
+      </div>
+      <div>
+        <label for="punto_venta">Punto de venta (Web Service)</label>
+        <input type="number" id="punto_venta" name="punto_venta" value="{{ cfg.punto_venta or '' }}" required>
+      </div>
+      <div>
+        <label for="razon_social">Razón social / Nombre</label>
+        <input type="text" id="razon_social" name="razon_social" value="{{ cfg.razon_social or '' }}">
+      </div>
+      <div>
+        <label for="actividad">Actividad (código, opcional)</label>
+        <input type="text" id="actividad" name="actividad" inputmode="numeric" value="{{ cfg.actividad or '' }}">
+      </div>
+      <div>
+        <label for="concepto">Concepto</label>
+        <select name="concepto" id="concepto">
+          <option value="1" {{ 'selected' if cfg.concepto == 1 }}>1 — Productos</option>
+          <option value="2" {{ 'selected' if cfg.concepto == 2 or not cfg.concepto }}>2 — Servicios</option>
+          <option value="3" {{ 'selected' if cfg.concepto == 3 }}>3 — Productos y servicios</option>
+        </select>
+      </div>
+      <div>
+        <label for="entorno">Entorno</label>
+        <select name="entorno" id="entorno">
+          <option value="homologacion" {{ 'selected' if cfg.entorno != 'produccion' }}>Homologación (pruebas)</option>
+          <option value="produccion" {{ 'selected' if cfg.entorno == 'produccion' }}>Producción (facturas reales)</option>
+        </select>
+      </div>
+    </div>
+    <button type="submit" id="btn-verif" style="margin-top:1.2rem">Guardar y verificar conexión</button>
+  </form>
+
+  <script>
+    document.querySelector('form').addEventListener('submit', () => {
+      const b = document.getElementById('btn-verif'); b.disabled = true; b.innerHTML = '<span class="spinner"></span>Verificando con ARCA…';
+    });
+  </script>
+{% endblock %}

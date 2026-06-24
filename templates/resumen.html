@@ -1,80 +1,55 @@
-<!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Control monotributo — Facturador ARCA</title>
-  <style>
-    :root { color-scheme: light dark; }
-    body { font-family: system-ui, sans-serif; max-width: 620px; margin: 6vh auto; padding: 0 1rem; }
-    h1 { font-size: 1.3rem; }
-    a.volver { font-size: .9rem; }
-    .destacado { background: #1e3a8a; color: #eff6ff; padding: 1.2rem 1.4rem; border-radius: 14px; margin: 1.2rem 0; }
-    .destacado small { color: #bfdbfe; }
-    .destacado b { font-size: 2rem; display: block; margin-top: .2rem; font-variant-numeric: tabular-nums; }
-    .cat-form { margin: 1.2rem 0 .4rem; display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
-    .cat-form label { font-weight: 600; font-size: .9rem; }
-    .cat-form select { padding: .5rem; border-radius: 8px; border: 1px solid #888; font-size: .95rem; background: inherit; color: inherit; }
-    .barra { height: 12px; background: rgba(255,255,255,.18); border-radius: 999px; overflow: hidden; margin-top: .8rem; }
-    .barra-fill { height: 100%; border-radius: 999px; transition: width .4s; }
-    .barra-fill.verde { background: #22c55e; }
-    .barra-fill.amarillo { background: #f59e0b; }
-    .barra-fill.rojo { background: #ef4444; }
-    .cat-msg { margin-top: .7rem; font-size: .92rem; line-height: 1.45; }
-    .nota-cat { color: #888; font-size: .78rem; margin: .3rem 0 0; }
-    .link-btn { background: none; border: none; color: #60a5fa; cursor: pointer; font-size: .78rem; padding: 0 .2rem; text-decoration: underline; }
-    .link-btn:disabled { color: #888; cursor: progress; text-decoration: none; }
-    table { width: 100%; border-collapse: collapse; font-size: .95rem; margin-top: 1rem; }
-    th, td { padding: .6rem .5rem; border-bottom: 1px solid #3334; }
-    th { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: #888; text-align: left; }
-    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-    details { border-bottom: 1px solid #3334; }
-    summary { display: flex; align-items: center; gap: .8rem; padding: .7rem .3rem; cursor: pointer; list-style: none; }
-    summary::-webkit-details-marker { display: none; }
-    summary::before { content: "▸"; color: #888; transition: transform .15s; }
-    details[open] summary::before { transform: rotate(90deg); }
-    .mes-nombre { font-weight: 600; min-width: 6rem; }
-    .mes-cant { color: #888; font-size: .85rem; }
-    .mes-total { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 600; }
-    table.detalle { margin: .2rem 0 1rem 1.2rem; width: calc(100% - 1.2rem); font-size: .85rem; }
-    table.detalle th { font-size: .7rem; }
-    .badge { font-size: .68rem; padding: .05rem .45rem; border-radius: 999px; font-weight: 600; }
-    .badge.fact { background: #c7d2fe; color: #3730a3; }
-    .badge.imp  { background: #e5e7eb; color: #374151; }
-    .leyenda { display: flex; gap: 1rem; font-size: .8rem; color: #888; margin: .5rem 0 0; }
-    .origen-resumen { color: #888; font-size: .78rem; margin: -.5rem 0 .8rem 1.2rem; }
-    .sync { display: flex; align-items: center; gap: .8rem; margin: 1rem 0; flex-wrap: wrap; }
-    button { padding: .6rem 1rem; font-size: .95rem; border-radius: 8px; border: none; background: #2563eb; color: #fff; cursor: pointer; font-weight: 600; }
-    button:disabled { opacity: .8; cursor: progress; }
-    .ok { background: #dcfce7; color: #166534; padding: .7rem 1rem; border-radius: 8px; }
-    .err { background: #fee2e2; color: #991b1b; padding: .7rem 1rem; border-radius: 8px; white-space: pre-wrap; }
-    .nota { color: #888; font-size: .8rem; margin-top: 1.5rem; }
-    .spinner { display:inline-block; width:1.1em; height:1.1em; vertical-align:-.2em; margin-right:.5em;
-               border:2.5px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:girar .7s linear infinite; }
-    @keyframes girar { to { transform: rotate(360deg); } }
-  </style>
-</head>
-<body>
-  <a class="volver" href="{{ url_for('index') }}">← Volver a facturar</a>
+{% extends "base.html" %}
+{% block title %}Control monotributo — Facturador ARCA{% endblock %}
+{% block style %}
+  .destacado { background: #1e3a8a; color: #eff6ff; padding: 1.2rem 1.4rem; border-radius: 14px; margin: 1.2rem 0; }
+  .destacado small { color: #bfdbfe; }
+  .destacado b { font-size: 2rem; display: block; margin-top: .2rem; font-variant-numeric: tabular-nums; }
+  .sync { display: flex; align-items: center; gap: .8rem; margin: 1rem 0; flex-wrap: wrap; }
+  .cat-form { margin: 1.2rem 0 .4rem; display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
+  .cat-form label { font-weight: 600; font-size: .9rem; }
+  .cat-form select { width: auto; }
+  .barra { height: 12px; background: rgba(255,255,255,.18); border-radius: 999px; overflow: hidden; margin-top: .8rem; }
+  .barra-fill { height: 100%; border-radius: 999px; transition: width .4s; }
+  .barra-fill.verde { background: #22c55e; } .barra-fill.amarillo { background: #f59e0b; } .barra-fill.rojo { background: #ef4444; }
+  .cat-msg { margin-top: .7rem; font-size: .92rem; line-height: 1.45; }
+  .nota-cat { color: #888; font-size: .78rem; margin: .3rem 0 0; }
+  .link-btn { background: none; border: none; color: #60a5fa; cursor: pointer; font-size: .78rem; padding: 0 .2rem; text-decoration: underline; font-weight: 400; }
+  table.detalle { margin: .2rem 0 1rem 1.2rem; width: calc(100% - 1.2rem); font-size: .85rem; border-collapse: collapse; }
+  table.detalle th, table.detalle td { padding: .4rem .5rem; border-bottom: 1px solid #3334; text-align: left; }
+  table.detalle th { font-size: .7rem; color: #888; text-transform: uppercase; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  details { border-bottom: 1px solid #3334; }
+  summary { display: flex; align-items: center; gap: .8rem; padding: .7rem .3rem; cursor: pointer; list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸"; color: #888; transition: transform .15s; }
+  details[open] summary::before { transform: rotate(90deg); }
+  .mes-nombre { font-weight: 600; min-width: 6rem; } .mes-cant { color: #888; font-size: .85rem; }
+  .mes-total { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .badge.fact { background: #c7d2fe; color: #3730a3; } .badge.imp { background: #e5e7eb; color: #374151; }
+  .leyenda { display: flex; gap: 1rem; font-size: .8rem; color: #888; margin: .5rem 0 0; }
+  .origen-resumen { color: #888; font-size: .78rem; margin: -.5rem 0 .8rem 1.2rem; }
+  .ok, .err { padding: .7rem 1rem; border-radius: 8px; }
+  .err { background: #fee2e2; color: #991b1b; white-space: pre-wrap; }
+{% endblock %}
+{% block content %}
   <h1>📊 Control monotributo</h1>
-  <p style="color:#888;font-size:.9rem">Total de TODOS tus comprobantes (todos los puntos de venta) · entorno {{ entorno }}</p>
+  <p class="muted">Total de TODOS tus comprobantes (todos los puntos de venta) · entorno {{ entorno }}</p>
 
   <form method="post" class="sync" id="form-csv" enctype="multipart/form-data">
-    <input type="file" name="csv" accept=".zip,.csv" id="input-csv" required>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="file" name="csv" accept=".zip,.csv" id="input-csv" required style="width:auto">
     <button type="submit" id="btn-csv">Importar ZIP / CSV</button>
     {% if msg %}<span class="ok">{{ msg }}</span>{% endif %}
     {% if error %}<span class="err">❌ {{ error }}</span>{% endif %}
   </form>
 
   {% if info %}
-  <p style="color:#888;font-size:.85rem">
-    Datos cargados: {{ info.cant }} comprobantes de {{ info.pvs }} punto(s) de venta,
-    del {{ info.desde[6:8] }}/{{ info.desde[4:6] }}/{{ info.desde[0:4] }}
-    al {{ info.hasta[6:8] }}/{{ info.hasta[4:6] }}/{{ info.hasta[0:4] }}.
-  </p>
+  <p class="muted">Datos cargados: {{ info.cant }} comprobantes de {{ info.pvs }} punto(s) de venta,
+    del {{ info.desde[6:8] }}/{{ info.desde[4:6] }}/{{ info.desde[0:4] }} al {{ info.hasta[6:8] }}/{{ info.hasta[4:6] }}/{{ info.hasta[0:4] }}.</p>
   {% endif %}
 
   <form method="post" class="cat-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <label for="categoria">Mi categoría de monotributo:</label>
     <select name="categoria" id="categoria" onchange="this.form.submit()">
       <option value="">— elegir —</option>
@@ -89,30 +64,22 @@
     <small>Acumulado últimos 12 meses (móvil) — {{ movil12.cantidad }} comprobantes</small>
     <b>$ {{ movil12.total|ars }}</b>
     {% if cat_info %}
-    <div class="barra">
-      <div class="barra-fill {{ 'rojo' if cat_info.excedido else ('amarillo' if cat_info.pct_real >= 80 else 'verde') }}"
-           style="width: {{ cat_info.pct }}%"></div>
-    </div>
+    <div class="barra"><div class="barra-fill {{ 'rojo' if cat_info.excedido else ('amarillo' if cat_info.pct_real >= 80 else 'verde') }}" style="width: {{ cat_info.pct }}%"></div></div>
     <div class="cat-msg">
       {% if cat_info.excedido %}
-        ⚠️ Te pasaste del tope de la <b>categoría {{ cat_info.categoria }}</b>
-        ($ {{ cat_info.tope|ars }}) por <b>$ {{ (-cat_info.restante)|ars }}</b>.
-        {% if cat_info.sugerida %}
-          Con esta facturación te corresponde <b>categoría {{ cat_info.sugerida }}</b>.
-        {% else %}
-          Estás por encima del tope máximo del monotributo (cat. K).
-        {% endif %}
+        ⚠️ Te pasaste del tope de la <b>categoría {{ cat_info.categoria }}</b> ($ {{ cat_info.tope|ars }}) por <b>$ {{ (-cat_info.restante)|ars }}</b>.
+        {% if cat_info.sugerida %}Con esta facturación te corresponde <b>categoría {{ cat_info.sugerida }}</b>.{% else %}Estás por encima del tope máximo del monotributo (cat. K).{% endif %}
       {% else %}
-        Tope de la <b>categoría {{ cat_info.categoria }}</b>: $ {{ cat_info.tope|ars }}.
-        Te faltan <b>$ {{ cat_info.restante|ars }}</b> para pasarte
-        ({{ cat_info.pct_real|round(1) }}% usado).
+        Tope de la <b>categoría {{ cat_info.categoria }}</b>: $ {{ cat_info.tope|ars }}. Te faltan <b>$ {{ cat_info.restante|ars }}</b> para pasarte ({{ cat_info.pct_real|round(1) }}% usado).
       {% endif %}
     </div>
     {% endif %}
   </div>
+
   <p class="nota-cat">
     Topes vigentes desde {{ vigente_desde }} (ARCA){% if topes_actualizado %} · actualizados el {{ topes_actualizado }}{% endif %}.
     <form method="post" style="display:inline" id="form-topes">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button type="submit" name="refrescar_topes" value="1" id="btn-topes" class="link-btn">↻ Actualizar desde ARCA</button>
     </form>
   </p>
@@ -122,8 +89,7 @@
     <span><span class="badge fact">facturador</span> generada por esta app</span>
     <span><span class="badge imp">importada</span> del CSV de Mis Comprobantes</span>
   </p>
-  <p style="color:#888;font-size:.8rem;margin:.3rem 0 1rem">Tocá un mes para ver el detalle ↓</p>
-
+  <p class="muted" style="margin:.3rem 0 1rem">Tocá un mes para ver el detalle ↓</p>
   {% for m in meses %}
   <details>
     <summary>
@@ -132,21 +98,13 @@
       <span class="mes-total">$ {{ m.total|ars }}</span>
     </summary>
     <table class="detalle">
-      <thead>
-        <tr><th>Fecha</th><th>Comprobante</th><th>Origen</th><th class="num">Importe</th></tr>
-      </thead>
+      <thead><tr><th>Fecha</th><th>Comprobante</th><th>Origen</th><th class="num">Importe</th></tr></thead>
       <tbody>
         {% for c in m.comprobantes %}
         <tr>
           <td>{{ c.fecha[6:8] }}/{{ c.fecha[4:6] }}/{{ c.fecha[0:4] }}</td>
           <td>{{ c.tipo }} {{ '%04d'|format(c.punto_venta) }}-{{ '%08d'|format(c.numero) }}</td>
-          <td>
-            {% if c.origen == 'facturador' %}
-              <span class="badge fact">facturador</span>
-            {% else %}
-              <span class="badge imp">importada</span>
-            {% endif %}
-          </td>
+          <td>{% if c.origen == 'facturador' %}<span class="badge fact">facturador</span>{% else %}<span class="badge imp">importada</span>{% endif %}</td>
           <td class="num">$ {{ c.importe|ars }}</td>
         </tr>
         {% endfor %}
@@ -156,36 +114,24 @@
   </details>
   {% endfor %}
   {% else %}
-  <p style="color:#888;margin-top:1.5rem">Todavía no hay comprobantes. Generá facturas o importá el CSV de Mis Comprobantes.</p>
+  <p class="muted" style="margin-top:1.5rem">Todavía no hay comprobantes. Generá facturas o importá el CSV de Mis Comprobantes.</p>
   {% endif %}
 
-  <div class="nota">
+  <div class="muted" style="margin-top:2rem">
     <b style="color:#aaa">Cómo exportar el CSV de Mis Comprobantes:</b>
     <ol style="margin:.4rem 0 0; padding-left:1.2rem; line-height:1.5">
       <li>Entrá a ARCA → servicio <b>"Mis Comprobantes"</b> → <b>Emitidos</b>.</li>
       <li>Elegí el rango de fechas (ej. los últimos 12 meses) y <b>Buscar</b>.</li>
-      <li>Descargá el archivo (AFIP lo da en <b>ZIP</b>; también sirve el CSV suelto).</li>
-      <li>Subilo acá tal cual con <b>"Importar ZIP / CSV"</b> — no hace falta descomprimirlo.</li>
+      <li>Descargá el archivo (ZIP) y subilo acá tal cual.</li>
     </ol>
-    <p style="margin-top:.8rem">
-      Incluye <b>todos</b> los puntos de venta y tipos de comprobante (las notas de
-      crédito restan). Reimportar un rango que se superpone no duplica. El acumulado
-      de 12 meses es el período móvil que mira ARCA — compará contra la tabla de
-      topes vigente.
-    </p>
   </div>
 
   <script>
     document.getElementById('form-csv').addEventListener('submit', () => {
-      const b = document.getElementById('btn-csv');
-      b.disabled = true;
-      b.innerHTML = '<span class="spinner"></span>Importando…';
+      const b = document.getElementById('btn-csv'); b.disabled = true; b.innerHTML = '<span class="spinner"></span>Importando…';
     });
     document.getElementById('form-topes').addEventListener('submit', () => {
-      const b = document.getElementById('btn-topes');
-      b.disabled = true;
-      b.textContent = 'Consultando ARCA…';
+      const b = document.getElementById('btn-topes'); b.disabled = true; b.textContent = 'Consultando ARCA…';
     });
   </script>
-</body>
-</html>
+{% endblock %}

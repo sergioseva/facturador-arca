@@ -9,6 +9,8 @@ certs/*.pem
 data/*.json
 data/*.xml
 data/*.db
+data/*.db.*
+data/*.bak*
 data/*.sqlite
 data/*.sqlite3
 

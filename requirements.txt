@@ -1,4 +1,7 @@
 Flask==3.0.3
+Flask-WTF==1.2.1
+Flask-Limiter==3.8.0
+email-validator==2.2.0
 zeep>=4.3.3
 cryptography==42.0.8
 python-dotenv==1.0.1

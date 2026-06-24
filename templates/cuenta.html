@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Mi cuenta — Facturador ARCA{% endblock %}
+{% block content %}
+  <h1>Mi cuenta</h1>
+  <p class="muted">{{ g.user.email }} · {{ g.user.role }}</p>
+
+  {% if msg %}<div class="ok" style="margin:1rem 0">{{ msg }}</div>{% endif %}
+  {% if error %}<div class="error" style="margin:1rem 0">❌ {{ error }}</div>{% endif %}
+
+  <h3>Datos de facturación</h3>
+  {% if cfg.cuit %}
+  <div class="card" style="margin-bottom:1rem">
+    CUIT {{ cfg.cuit }} · Pto. venta {{ cfg.punto_venta }} ·
+    {% if cfg.entorno == 'produccion' %}<span class="badge prod">producción</span>{% else %}<span class="badge homo">homologación</span>{% endif %}
+    · conexión {% if cfg.delegacion_ok %}✅ verificada{% else %}⚠️ pendiente{% endif %}
+  </div>
+  {% endif %}
+  <a class="btn" href="{{ url_for('onboarding') }}">Editar datos / re-verificar conexión</a>
+
+  <h3 style="margin-top:2rem">Cambiar clave</h3>
+  <form method="post" style="max-width:360px">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label for="password_actual">Clave actual</label>
+    <input type="password" id="password_actual" name="password_actual" required>
+    <label for="password_nueva">Clave nueva (mín. 8)</label>
+    <input type="password" id="password_nueva" name="password_nueva" required>
+    <button type="submit" style="margin-top:1rem">Cambiar clave</button>
+  </form>
+{% endblock %}
