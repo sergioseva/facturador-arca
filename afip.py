@@ -228,6 +228,21 @@ def verificar_delegacion(cuit, entorno, cert_path, key_path, punto_venta,
     return {"ultimo": int(resp.CbteNro)}
 
 
+def listar_puntos_venta(cuit, entorno, cert_path, key_path):
+    """Números de punto de venta habilitados para Web Service del CUIT (ordenados)."""
+    auth = get_auth(cuit, entorno, cert_path, key_path, service="wsfe")
+    client = _wsfe_client(entorno)
+    resp = client.service.FEParamGetPtosVenta(Auth=auth)
+    r = getattr(resp, "ResultGet", None)
+    pvs = []
+    if r and getattr(r, "PtoVenta", None):
+        for p in r.PtoVenta:
+            baja = str(getattr(p, "FchBaja", "") or "").upper()
+            if getattr(p, "Bloqueado", "N") != "S" and baja in ("", "NULL"):
+                pvs.append(int(p.Nro))
+    return sorted(pvs)
+
+
 def consultar_padron(idpersona, entorno, cert_path, key_path, cuit_plataforma):
     """
     Consulta el padrón de ARCA (constancia A5) por CUIT/CUIL y devuelve

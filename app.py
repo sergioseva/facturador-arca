@@ -337,7 +337,17 @@ def onboarding():
             except Exception as e:  # noqa: BLE001
                 db.set_delegacion_ok(uid, 0)
                 msg = str(e)
-                if "lista de relaciones" in msg or "[600]" in msg:
+                if "11002" in msg:
+                    try:
+                        pvs = afip.listar_puntos_venta(cuit, entorno, PLATFORM_CERT, PLATFORM_KEY)
+                    except Exception:  # noqa: BLE001
+                        pvs = []
+                    if pvs:
+                        disp = "Tus puntos de venta Web Service disponibles son: " + ", ".join(str(p) for p in pvs) + "."
+                    else:
+                        disp = "No encontramos puntos de venta Web Service: creá uno del tipo “Factura Electrónica – Web Services”."
+                    error = f"El punto de venta {pv} no está habilitado para Web Service. {disp}"
+                elif "lista de relaciones" in msg or "[600]" in msg:
                     error = (
                         "Todavía no está habilitada la delegación. Si ya autorizaste el "
                         "servicio WSFE a la plataforma, ARCA puede tardar un rato en "
