@@ -313,61 +313,68 @@ def onboarding():
     cfg = db.get_tenant_config(uid) or {}
     error = None
 
-    if request.method == "POST":
-        cuit = "".join(c for c in request.form.get("cuit", "") if c.isdigit())
-        pv = request.form.get("punto_venta", "").strip()
-        actividad = "".join(c for c in request.form.get("actividad", "") if c.isdigit())
-        razon = request.form.get("razon_social", "").strip()
-        concepto = request.form.get("concepto", "2").strip()
-        entorno = request.form.get("entorno", "homologacion").strip()
+    if request.method == "POST" and request.form.get("accion") == "marcar":
+        # El cliente avisa que completó sus pasos en AFIP.
+        db.upsert_tenant_config(
+            uid, cliente_marco_arca=1,
+            arca_marcado_en=datetime.now(afip.AR_TZ).strftime("%d/%m/%Y %H:%M"),
+        )
+        cfg = db.get_tenant_config(uid) or {}
 
-        if len(cuit) != 11:
-            error = "El CUIT debe tener 11 dígitos (sin guiones)."
-        elif not pv.isdigit():
-            error = "El punto de venta debe ser un número."
+    elif request.method == "POST":
+        # Carga de datos + verificación — solo si el admin habilitó.
+        if not cfg.get("admin_habilito"):
+            error = "Todavía no está habilitada la carga de datos. Esperá la confirmación del administrador."
         else:
-            marco = 1 if request.form.get("marco_arca") else 0
-            campos = dict(
-                cuit=cuit, punto_venta=int(pv), actividad=actividad or None,
-                razon_social=razon, concepto=int(concepto), entorno=entorno,
-                cliente_marco_arca=marco,
-            )
-            if marco:
-                campos["arca_marcado_en"] = datetime.now(afip.AR_TZ).strftime("%d/%m/%Y %H:%M")
-            db.upsert_tenant_config(uid, **campos)
-            try:
-                afip.verificar_delegacion(cuit, entorno, PLATFORM_CERT, PLATFORM_KEY, int(pv))
-                db.set_delegacion_ok(uid, 1)
-                return redirect(url_for("facturar"))
-            except Exception as e:  # noqa: BLE001
-                db.set_delegacion_ok(uid, 0)
-                msg = str(e)
-                if "11002" in msg:
-                    try:
-                        pvs = afip.listar_puntos_venta(cuit, entorno, PLATFORM_CERT, PLATFORM_KEY)
-                    except Exception:  # noqa: BLE001
-                        pvs = []
-                    if pvs:
-                        disp = "Tus puntos de venta Web Service disponibles son: " + ", ".join(str(p) for p in pvs) + "."
+            cuit = "".join(c for c in request.form.get("cuit", "") if c.isdigit())
+            pv = request.form.get("punto_venta", "").strip()
+            actividad = "".join(c for c in request.form.get("actividad", "") if c.isdigit())
+            razon = request.form.get("razon_social", "").strip()
+            concepto = request.form.get("concepto", "2").strip()
+            entorno = request.form.get("entorno", "homologacion").strip()
+
+            if len(cuit) != 11:
+                error = "El CUIT debe tener 11 dígitos (sin guiones)."
+            elif not pv.isdigit():
+                error = "El punto de venta debe ser un número."
+            else:
+                db.upsert_tenant_config(
+                    uid, cuit=cuit, punto_venta=int(pv), actividad=actividad or None,
+                    razon_social=razon, concepto=int(concepto), entorno=entorno,
+                )
+                try:
+                    afip.verificar_delegacion(cuit, entorno, PLATFORM_CERT, PLATFORM_KEY, int(pv))
+                    db.set_delegacion_ok(uid, 1)
+                    return redirect(url_for("facturar"))
+                except Exception as e:  # noqa: BLE001
+                    db.set_delegacion_ok(uid, 0)
+                    msg = str(e)
+                    if "11002" in msg:
+                        try:
+                            pvs = afip.listar_puntos_venta(cuit, entorno, PLATFORM_CERT, PLATFORM_KEY)
+                        except Exception:  # noqa: BLE001
+                            pvs = []
+                        if pvs:
+                            disp = "Tus puntos de venta Web Service disponibles son: " + ", ".join(str(p) for p in pvs) + "."
+                        else:
+                            disp = "No encontramos puntos de venta Web Service: creá uno del tipo “Factura Electrónica – Web Services”."
+                        error = f"El punto de venta {pv} no está habilitado para Web Service. {disp}"
+                    elif "lista de relaciones" in msg or "[600]" in msg:
+                        error = (
+                            "Todavía no está habilitada la delegación. Si ya autorizaste el "
+                            "servicio WSFE a la plataforma, ARCA puede tardar un rato en "
+                            "habilitarla (de minutos a un par de horas, a veces hasta el día "
+                            "siguiente). Esperá un poco y volvé a tocar “Verificar conexión” — "
+                            "no hace falta volver a autorizar."
+                        )
                     else:
-                        disp = "No encontramos puntos de venta Web Service: creá uno del tipo “Factura Electrónica – Web Services”."
-                    error = f"El punto de venta {pv} no está habilitado para Web Service. {disp}"
-                elif "lista de relaciones" in msg or "[600]" in msg:
-                    error = (
-                        "Todavía no está habilitada la delegación. Si ya autorizaste el "
-                        "servicio WSFE a la plataforma, ARCA puede tardar un rato en "
-                        "habilitarla (de minutos a un par de horas, a veces hasta el día "
-                        "siguiente). Esperá un poco y volvé a tocar “Verificar conexión” — "
-                        "no hace falta volver a autorizar."
-                    )
-                else:
-                    error = (
-                        f"ARCA no validó la conexión: {e}\n\n"
-                        "Revisá que (1) hayas autorizado el computador fiscal de la "
-                        "plataforma para el servicio WSFE en Administrador de Relaciones, "
-                        "y (2) que el punto de venta sea del tipo Web Service."
-                    )
-            cfg = db.get_tenant_config(uid) or {}
+                        error = (
+                            f"ARCA no validó la conexión: {e}\n\n"
+                            "Revisá que (1) hayas autorizado el computador fiscal de la "
+                            "plataforma para el servicio WSFE en Administrador de Relaciones, "
+                            "y (2) que el punto de venta sea del tipo Web Service."
+                        )
+                cfg = db.get_tenant_config(uid) or {}
 
     return render_template(
         "onboarding.html", cfg=cfg, error=error,
@@ -442,10 +449,16 @@ def admin_users():
                 pw = secrets.token_urlsafe(9)
                 db.set_user_password(target, auth.hash_password(pw))
                 msg = f"Clave de {u['email']} reseteada. Clave temporal nueva: {pw}"
+        elif accion == "habilitar":
+            target = int(request.form.get("user_id"))
+            u = db.get_user_by_id(target)
+            db.upsert_tenant_config(target, admin_habilito=1)
+            msg = f"Habilitaste la carga de datos para {u['email'] if u else target}."
     usuarios = db.list_users_estado()
     esperando = sum(
         1 for u in usuarios
-        if u.get("cliente_marco_arca") and not u.get("delegacion_ok") and u["role"] != "admin"
+        if u.get("cliente_marco_arca") and not u.get("admin_habilito")
+        and not u.get("delegacion_ok") and u["role"] != "admin"
     )
     return render_template(
         "admin_users.html", usuarios=usuarios, esperando=esperando, msg=msg, error=error

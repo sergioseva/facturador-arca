@@ -46,7 +46,7 @@
     <thead><tr><th>ID</th><th>Email</th><th>Rol</th><th>Estado</th><th>Conexión ARCA</th><th>Alta</th><th></th></tr></thead>
     <tbody>
       {% for u in usuarios %}
-      <tr class="{{ 'row-espera' if u.cliente_marco_arca and not u.delegacion_ok and u.role != 'admin' }}">
+      <tr class="{{ 'row-espera' if u.cliente_marco_arca and not u.admin_habilito and not u.delegacion_ok and u.role != 'admin' }}">
         <td>{{ u.id }}</td>
         <td>{{ u.email }}</td>
         <td>{{ u.role }}</td>
@@ -54,7 +54,16 @@
         <td>
           {% if u.role == 'admin' %}<span class="muted">—</span>
           {% elif u.delegacion_ok %}<span class="badge conok">✅ conectado</span>
-          {% elif u.cliente_marco_arca %}<span class="badge espera">🔔 listo para tu paso 4</span>{% if u.arca_marcado_en %}<br><small class="muted">marcó {{ u.arca_marcado_en }}</small>{% endif %}
+          {% elif u.cliente_marco_arca and not u.admin_habilito %}
+            <span class="badge espera">🔔 listo para tu paso 4</span>
+            {% if u.arca_marcado_en %}<br><small class="muted">marcó {{ u.arca_marcado_en }}</small>{% endif %}
+            <br><form method="post" class="inline" style="margin-top:.3rem">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="accion" value="habilitar">
+              <input type="hidden" name="user_id" value="{{ u.id }}">
+              <button type="submit" class="btn-sm">Habilitar carga ✓</button>
+            </form>
+          {% elif u.admin_habilito %}<span class="muted">✓ habilitado · esperando que cargue</span>
           {% else %}<span class="muted">⏳ esperando al cliente</span>{% endif %}
         </td>
         <td class="muted">{{ u.created_at[0:10] }}</td>

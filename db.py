@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS tenant_config (
     onboarding_step INTEGER NOT NULL DEFAULT 0,
     cliente_marco_arca INTEGER NOT NULL DEFAULT 0,
     arca_marcado_en TEXT,
+    admin_habilito  INTEGER NOT NULL DEFAULT 0,
     created_at      TEXT NOT NULL
 )
 """
@@ -123,7 +124,7 @@ CREATE TABLE IF NOT EXISTS tenant_config (
 _TENANT_COLS = {
     "cuit", "punto_venta", "entorno", "concepto", "actividad",
     "razon_social", "categoria", "delegacion_ok", "onboarding_step",
-    "cliente_marco_arca", "arca_marcado_en",
+    "cliente_marco_arca", "arca_marcado_en", "admin_habilito",
 }
 
 
@@ -213,7 +214,8 @@ def init_db():
         # columnas nuevas de tenant_config (para DBs existentes)
         tcols = _cols(conn, "tenant_config")
         for col, ddl in (("cliente_marco_arca", "INTEGER NOT NULL DEFAULT 0"),
-                         ("arca_marcado_en", "TEXT")):
+                         ("arca_marcado_en", "TEXT"),
+                         ("admin_habilito", "INTEGER NOT NULL DEFAULT 0")):
             if col not in tcols:
                 conn.execute(f"ALTER TABLE tenant_config ADD COLUMN {col} {ddl}")
 
@@ -285,7 +287,7 @@ def list_users_estado():
             """
             SELECT u.id, u.email, u.role, u.activo, u.created_at,
                    t.cuit, t.punto_venta, t.delegacion_ok,
-                   t.cliente_marco_arca, t.arca_marcado_en
+                   t.cliente_marco_arca, t.arca_marcado_en, t.admin_habilito
             FROM users u LEFT JOIN tenant_config t ON t.user_id = u.id
             ORDER BY u.id
             """

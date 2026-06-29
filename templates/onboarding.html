@@ -40,9 +40,29 @@
     <li>Anotá el número que te asigna.</li>
   </ol>
 
-  <h3>3. Cargá tus datos y verificá</h3>
-  <form method="post">
+  <h3>3. Avisanos que terminaste en AFIP</h3>
+  {% if cfg.cliente_marco_arca %}
+    <div class="ok">✅ Marcaste que completaste tus pasos{% if cfg.arca_marcado_en %} ({{ cfg.arca_marcado_en }}){% endif %}.
+      {% if not cfg.admin_habilito %}<br>Ahora <b>esperá que el administrador habilite tu cuenta</b> para cargar tus datos.{% endif %}
+    </div>
+  {% else %}
+    <p class="muted">Cuando hayas autorizado el computador fiscal (paso 1) y creado el punto de venta (paso 2), avisanos para que el administrador habilite tu cuenta:</p>
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="accion" value="marcar">
+      <button type="submit">Ya completé mis pasos en AFIP</button>
+    </form>
+  {% endif %}
+
+  <h3>4. Cargá tus datos y verificá</h3>
+  {% if not cfg.admin_habilito %}
+    <div class="info-box">🔒 Esta sección se habilita cuando el administrador confirme que ya hizo su parte.
+      {% if cfg.cliente_marco_arca %}Ya avisaste — esperá la habilitación.{% else %}Primero marcá el paso 3.{% endif %}</div>
+  {% endif %}
+  <form method="post" id="form-verif">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="accion" value="verificar">
+    <fieldset {{ 'disabled' if not cfg.admin_habilito }} style="border:none; padding:0; margin:0; min-inline-size:auto">
     <div class="grid2">
       <div>
         <label for="cuit">Tu CUIT (sin guiones)</label>
@@ -76,18 +96,15 @@
         </select>
       </div>
     </div>
-    <label style="display:flex; gap:.6rem; align-items:flex-start; margin-top:1.3rem; font-weight:500; cursor:pointer">
-      <input type="checkbox" name="marco_arca" value="1" style="width:auto; margin-top:.25rem; flex-shrink:0" {{ 'checked' if cfg.cliente_marco_arca }}>
-      <span>Ya completé mis pasos en AFIP: <b>autoricé el computador fiscal</b> de la plataforma y <b>creé el punto de venta Web Service</b>.
-      <br><span class="muted">Esto le avisa al administrador para que habilite la conexión.</span></span>
-    </label>
-
     <button type="submit" id="btn-verif" style="margin-top:1.2rem">Guardar y verificar conexión</button>
+    </fieldset>
   </form>
 
   <script>
-    document.querySelector('form').addEventListener('submit', () => {
-      const b = document.getElementById('btn-verif'); b.disabled = true; b.innerHTML = '<span class="spinner"></span>Verificando con ARCA…';
+    const fv = document.getElementById('form-verif');
+    if (fv) fv.addEventListener('submit', () => {
+      const b = document.getElementById('btn-verif');
+      if (b) { b.disabled = true; b.innerHTML = '<span class="spinner"></span>Verificando con ARCA…'; }
     });
   </script>
 {% endblock %}
