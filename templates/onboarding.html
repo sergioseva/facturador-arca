@@ -54,15 +54,16 @@
     </form>
   {% endif %}
 
+  {% set habilitado = cfg.admin_habilito or cfg.delegacion_ok %}
   <h3>4. Cargá tus datos y verificá</h3>
-  {% if not cfg.admin_habilito %}
+  {% if not habilitado %}
     <div class="info-box">🔒 Esta sección se habilita cuando el administrador confirme que ya hizo su parte.
       {% if cfg.cliente_marco_arca %}Ya avisaste — esperá la habilitación.{% else %}Primero marcá el paso 3.{% endif %}</div>
   {% endif %}
   <form method="post" id="form-verif">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="accion" value="verificar">
-    <fieldset {{ 'disabled' if not cfg.admin_habilito }} style="border:none; padding:0; margin:0; min-inline-size:auto">
+    <fieldset {{ 'disabled' if not habilitado }} style="border:none; padding:0; margin:0; min-inline-size:auto">
     <div class="grid2">
       <div>
         <label for="cuit">Tu CUIT (sin guiones)</label>

@@ -322,8 +322,8 @@ def onboarding():
         cfg = db.get_tenant_config(uid) or {}
 
     elif request.method == "POST":
-        # Carga de datos + verificación — solo si el admin habilitó.
-        if not cfg.get("admin_habilito"):
+        # Carga de datos + verificación — solo si el admin habilitó (o ya conectado).
+        if not (cfg.get("admin_habilito") or cfg.get("delegacion_ok")):
             error = "Todavía no está habilitada la carga de datos. Esperá la confirmación del administrador."
         else:
             cuit = "".join(c for c in request.form.get("cuit", "") if c.isdigit())
