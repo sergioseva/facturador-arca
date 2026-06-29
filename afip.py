@@ -238,7 +238,9 @@ def consultar_padron(idpersona, entorno, cert_path, key_path, cuit_plataforma):
     if len(idp) != 11:
         raise AfipError("La consulta de padrón necesita un CUIT/CUIL de 11 dígitos.")
 
-    auth = get_auth(cuit_plataforma, entorno, cert_path, key_path, service="ws_sr_padron_a5")
+    auth = get_auth(
+        cuit_plataforma, entorno, cert_path, key_path, service="ws_sr_constancia_inscripcion"
+    )
     client = Client(PADRON_WSDL[entorno], transport=Transport(timeout=30, session=_session()))
     try:
         resp = client.service.getPersona(
