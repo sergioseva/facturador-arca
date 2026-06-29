@@ -149,15 +149,17 @@ def _cache_path(entorno: str, service: str) -> Path:
     return DATA_DIR / f"ta_{entorno}_{service}.json"
 
 
-def get_auth(cuit, entorno, cert_path, key_path, service="wsfe"):
+def get_auth(cuit, entorno, cert_path, key_path, service="wsfe", forzar=False):
     """
     Devuelve {'Token','Sign','Cuit'} listo para mandar a WSFE.
     Token+Sign vienen del certificado de la plataforma (cacheados por
     entorno+servicio, compartidos entre tenants); `Cuit` es el representado y
     varía por llamada (modelo de delegación / computador fiscal).
+    `forzar=True` ignora el cache y pide un token nuevo (para tomar delegaciones
+    recién habilitadas: la lista de representados queda fijada al emitir el token).
     """
     cache = _cache_path(entorno, service)
-    if cache.exists():
+    if not forzar and cache.exists():
         ta = json.loads(cache.read_text())
         # Renovamos con 10 min de margen antes de que expire.
         if datetime.fromisoformat(ta["expires"]) - timedelta(minutes=10) > datetime.now(AR_TZ):
@@ -219,7 +221,12 @@ def verificar_delegacion(cuit, entorno, cert_path, key_path, punto_venta,
     delegación o el punto de venta no están bien, ARCA devuelve un error que se
     propaga como AfipError. Devuelve {'ultimo': int} si todo está OK.
     """
-    auth = get_auth(cuit, entorno, cert_path, key_path, service="wsfe")
+    # Token fresco para tomar delegaciones recién habilitadas (el cacheado puede
+    # ser anterior a la delegación). Si WSAA rechaza el re-login, usa el cache.
+    try:
+        auth = get_auth(cuit, entorno, cert_path, key_path, service="wsfe", forzar=True)
+    except AfipError:
+        auth = get_auth(cuit, entorno, cert_path, key_path, service="wsfe")
     client = _wsfe_client(entorno)
     resp = client.service.FECompUltimoAutorizado(
         Auth=auth, PtoVta=int(punto_venta), CbteTipo=cbte_tipo
