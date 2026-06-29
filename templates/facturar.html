@@ -20,6 +20,11 @@
   .error { margin-top: 1.5rem; }
   .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); align-items: center; justify-content: center; z-index: 10; }
   .overlay .box { background: #1f2937; color: #e5e7eb; padding: 1.5rem 2rem; border-radius: 14px; text-align: center; }
+  .box.confirm { text-align: left; max-width: 380px; width: 92%; padding: 1.5rem; }
+  .box.confirm dl { display: grid; grid-template-columns: auto 1fr; gap: .4rem .9rem; margin: 0 0 1rem; font-size: .95rem; }
+  .box.confirm dt { color: #9ca3af; } .box.confirm dd { margin: 0; font-weight: 700; text-align: right; }
+  .cf-warn { background: rgba(245,158,11,.18); color: #fbbf24; padding: .55rem .75rem; border-radius: 8px; font-size: .85rem; margin: 0 0 1.1rem; }
+  .cf-actions { display: flex; gap: .6rem; } .cf-actions button { flex: 1; margin: 0; }
   .overlay .spinner { width: 2.2em; height: 2.2em; border-width: 4px; margin: 0 0 .8rem; border-color: rgba(255,255,255,.25); border-top-color: #3b82f6; }
 {% endblock %}
 {% block content %}
@@ -31,7 +36,7 @@
   </p>
 
   <div class="card">
-  <form method="post" id="form-factura">
+  <form method="post" id="form-factura" data-entorno="{{ entorno }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <label for="importe" style="margin-top:0">Monto que ingresó</label>
     <div class="moneda">
@@ -96,6 +101,23 @@
     </div>
   </div>
 
+  <div class="overlay" id="confirm-modal">
+    <div class="box confirm">
+      <h3 style="margin:0 0 .9rem">Confirmá la factura</h3>
+      <dl>
+        <dt>Importe</dt><dd id="cf-importe"></dd>
+        <dt>Fecha</dt><dd id="cf-fecha"></dd>
+        <dt>Receptor</dt><dd id="cf-receptor"></dd>
+        <dt>Entorno</dt><dd id="cf-entorno"></dd>
+      </dl>
+      <p id="cf-warn" class="cf-warn">⚠️ Esta factura es <b>real</b> y válida fiscalmente.</p>
+      <div class="cf-actions">
+        <button type="button" class="btn-ghost" id="cf-cancelar">Cancelar</button>
+        <button type="button" id="cf-confirmar">Confirmar y facturar</button>
+      </div>
+    </div>
+  </div>
+
   {% if resultado %}
   <div class="ok card">
     <h2>✅ Factura generada</h2>
@@ -121,12 +143,37 @@
       const decPart = rest.length ? ',' + rest.join('').slice(0, 2) : '';
       importe.value = intPart + decPart;
     });
-    document.getElementById('form-factura').addEventListener('submit', (e) => {
+    const form = document.getElementById('form-factura');
+    const modal = document.getElementById('confirm-modal');
+    // Al "Generar": en vez de enviar, mostramos el resumen para confirmar.
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
       const limpio = importe.value.replace(/\./g, '').replace(',', '.');
-      if (!(parseFloat(limpio) > 0)) { e.preventDefault(); alert('Ingresá un monto mayor a 0.'); return; }
+      if (!(parseFloat(limpio) > 0)) { alert('Ingresá un monto mayor a 0.'); return; }
+      document.getElementById('cf-importe').textContent = '$ ' + (importe.value || '0,00');
+      const f = document.getElementById('fecha').value;
+      document.getElementById('cf-fecha').textContent = f ? f.split('-').reverse().join('/') : 'hoy';
+      let rec;
+      if (docTipo.value === '99') { rec = 'Consumidor Final'; }
+      else {
+        const t = docTipo.options[docTipo.selectedIndex].text.split(' ')[0];
+        const nro = document.getElementById('doc_nro').value.trim();
+        const nom = document.getElementById('receptor_nombre').value.trim();
+        rec = t + ' ' + nro + (nom ? ' · ' + nom : '');
+      }
+      document.getElementById('cf-receptor').textContent = rec;
+      const prod = form.dataset.entorno === 'produccion';
+      document.getElementById('cf-entorno').textContent = prod ? 'Producción (real)' : 'Homologación (pruebas)';
+      document.getElementById('cf-warn').style.display = prod ? 'block' : 'none';
+      modal.style.display = 'flex';
+    });
+    document.getElementById('cf-cancelar').addEventListener('click', () => { modal.style.display = 'none'; });
+    document.getElementById('cf-confirmar').addEventListener('click', () => {
+      modal.style.display = 'none';
       const btn = document.getElementById('btn-facturar');
       btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Generando…';
       document.getElementById('overlay').style.display = 'flex';
+      form.submit();
     });
     window.addEventListener('pageshow', () => {
       document.getElementById('overlay').style.display = 'none';
