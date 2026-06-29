@@ -9,8 +9,9 @@
       --bg: #e9ebef; --surface: #ffffff; --surface-2: #f4f5f7; --field: #f7f8fa;
       --border: #d2d7df; --border-strong: #bcc4cf;
       --text: #1b1f27; --muted: #6b7280;
-      --primary: #2563eb; --primary-hover: #1d4ed8; --primary-soft: #eef3fe; --on-primary: #ffffff;
-      --ring: rgba(37,99,235,.22);
+      --primary: #16a34a; --primary-hover: #15803d; --primary-soft: #e7f8ee; --on-primary: #ffffff;
+      --accent-2: #4ade80;
+      --ring: rgba(22,163,74,.22);
       --ok-bg: #dcfce7; --ok-fg: #166534; --err-bg: #fee2e2; --err-fg: #991b1b;
       --warn-bg: #fef3c7; --warn-fg: #92400e;
       --radius: 14px; --radius-sm: 9px;
@@ -22,8 +23,9 @@
         --bg: #121419; --surface: #1c1f26; --surface-2: #23262e; --field: #262b34;
         --border: #333a45; --border-strong: #444c59;
         --text: #e6e8ec; --muted: #9aa3b0;
-        --primary: #3b82f6; --primary-hover: #60a5fa; --primary-soft: #1a2438;
-        --ring: rgba(59,130,246,.35);
+        --primary: #22c55e; --primary-hover: #4ade80; --primary-soft: #16271d;
+        --accent-2: #4ade80;
+        --ring: rgba(34,197,94,.32);
         --ok-bg: #0f3d24; --ok-fg: #86efac; --err-bg: #3f1717; --err-fg: #fca5a5;
         --warn-bg: #3a2f0a; --warn-fg: #fde68a;
         --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 30px -16px rgba(0,0,0,.7);
@@ -49,7 +51,7 @@
     header.bar .inner { max-width: 980px; margin: 0 auto; display: flex; align-items: center; gap: .4rem; padding: .7rem 1.1rem; flex-wrap: wrap; }
     .brand { display: inline-flex; align-items: center; gap: .55rem; font-weight: 800; letter-spacing: -.02em; font-size: 1.06rem; text-decoration: none; color: var(--text); }
     .brand .mark { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px;
-      background: linear-gradient(135deg, var(--primary), #60a5fa); color: #fff; font-weight: 800; font-size: 1.05rem;
+      background: linear-gradient(135deg, var(--primary), var(--accent-2)); color: #fff; font-weight: 800; font-size: 1.05rem;
       letter-spacing: -.03em; box-shadow: 0 4px 12px -3px var(--ring); }
     .brand .nm { font-weight: 800; }
     .brand .nm b { color: var(--primary); }
