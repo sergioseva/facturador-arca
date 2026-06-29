@@ -336,12 +336,22 @@ def onboarding():
                 return redirect(url_for("facturar"))
             except Exception as e:  # noqa: BLE001
                 db.set_delegacion_ok(uid, 0)
-                error = (
-                    f"ARCA no validó la conexión: {e}\n\n"
-                    "Revisá que (1) hayas autorizado el computador fiscal de la "
-                    "plataforma para el servicio WSFE en Administrador de Relaciones, "
-                    "y (2) que el punto de venta sea del tipo Web Service."
-                )
+                msg = str(e)
+                if "lista de relaciones" in msg or "[600]" in msg:
+                    error = (
+                        "Todavía no está habilitada la delegación. Si ya autorizaste el "
+                        "servicio WSFE a la plataforma, ARCA puede tardar un rato en "
+                        "habilitarla (de minutos a un par de horas, a veces hasta el día "
+                        "siguiente). Esperá un poco y volvé a tocar “Verificar conexión” — "
+                        "no hace falta volver a autorizar."
+                    )
+                else:
+                    error = (
+                        f"ARCA no validó la conexión: {e}\n\n"
+                        "Revisá que (1) hayas autorizado el computador fiscal de la "
+                        "plataforma para el servicio WSFE en Administrador de Relaciones, "
+                        "y (2) que el punto de venta sea del tipo Web Service."
+                    )
             cfg = db.get_tenant_config(uid) or {}
 
     return render_template(

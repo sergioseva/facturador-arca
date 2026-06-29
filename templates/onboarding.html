@@ -7,6 +7,8 @@
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
   @media (max-width: 500px) { .grid2 { grid-template-columns: 1fr; } }
   .error { margin: 1rem 0; }
+  .info-box { background: var(--primary-soft); color: var(--text); border: 1px solid var(--border);
+    border-left: 3px solid var(--primary); border-radius: var(--radius-sm); padding: .8rem 1rem; margin: .6rem 0 1.4rem; font-size: .9rem; line-height: 1.5; }
 {% endblock %}
 {% block content %}
   <h1>Conectá tu cuenta con ARCA</h1>
@@ -23,6 +25,13 @@
     </li>
     <li>Confirmá. Esto es lo que nos habilita a emitir tus comprobantes.</li>
   </ol>
+
+  <div class="info-box">
+    ℹ️ <b>Importante:</b> después de autorizar, la plataforma confirma la delegación y
+    <b>ARCA tarda un rato en habilitarla</b> (de unos minutos a un par de horas, a veces
+    hasta el día siguiente). Si al verificar (paso 3) te da error apenas autorizás, es
+    normal: <b>esperá un rato y reintentá</b> — no hace falta volver a autorizar.
+  </div>
 
   <h3>2. Creá un punto de venta Web Service</h3>
   <ol class="pasos">
