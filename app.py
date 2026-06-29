@@ -326,10 +326,15 @@ def onboarding():
         elif not pv.isdigit():
             error = "El punto de venta debe ser un número."
         else:
-            db.upsert_tenant_config(
-                uid, cuit=cuit, punto_venta=int(pv), actividad=actividad or None,
+            marco = 1 if request.form.get("marco_arca") else 0
+            campos = dict(
+                cuit=cuit, punto_venta=int(pv), actividad=actividad or None,
                 razon_social=razon, concepto=int(concepto), entorno=entorno,
+                cliente_marco_arca=marco,
             )
+            if marco:
+                campos["arca_marcado_en"] = datetime.now(afip.AR_TZ).strftime("%d/%m/%Y %H:%M")
+            db.upsert_tenant_config(uid, **campos)
             try:
                 afip.verificar_delegacion(cuit, entorno, PLATFORM_CERT, PLATFORM_KEY, int(pv))
                 db.set_delegacion_ok(uid, 1)
@@ -437,7 +442,14 @@ def admin_users():
                 pw = secrets.token_urlsafe(9)
                 db.set_user_password(target, auth.hash_password(pw))
                 msg = f"Clave de {u['email']} reseteada. Clave temporal nueva: {pw}"
-    return render_template("admin_users.html", usuarios=db.list_users(), msg=msg, error=error)
+    usuarios = db.list_users_estado()
+    esperando = sum(
+        1 for u in usuarios
+        if u.get("cliente_marco_arca") and not u.get("delegacion_ok") and u["role"] != "admin"
+    )
+    return render_template(
+        "admin_users.html", usuarios=usuarios, esperando=esperando, msg=msg, error=error
+    )
 
 
 if __name__ == "__main__":

@@ -76,6 +76,12 @@
         </select>
       </div>
     </div>
+    <label style="display:flex; gap:.6rem; align-items:flex-start; margin-top:1.3rem; font-weight:500; cursor:pointer">
+      <input type="checkbox" name="marco_arca" value="1" style="width:auto; margin-top:.25rem; flex-shrink:0" {{ 'checked' if cfg.cliente_marco_arca }}>
+      <span>Ya completé mis pasos en AFIP: <b>autoricé el computador fiscal</b> de la plataforma y <b>creé el punto de venta Web Service</b>.
+      <br><span class="muted">Esto le avisa al administrador para que habilite la conexión.</span></span>
+    </label>
+
     <button type="submit" id="btn-verif" style="margin-top:1.2rem">Guardar y verificar conexión</button>
   </form>
 

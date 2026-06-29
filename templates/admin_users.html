@@ -11,6 +11,11 @@
   .subnav { display: flex; gap: .5rem; margin-bottom: 1.2rem; }
   .subnav a { font-size: .9rem; padding: .4rem .8rem; border-radius: 8px; text-decoration: none; color: var(--muted); border: 1px solid var(--border); }
   .subnav a.active { background: var(--primary-soft); color: var(--primary); border-color: transparent; font-weight: 600; }
+  .aviso-paso4 { background: var(--warn-bg); color: var(--warn-fg); border: 1px solid var(--warn-fg); border-radius: var(--radius-sm); padding: .8rem 1rem; margin: 1rem 0; font-size: .92rem; }
+  .aviso-paso4 a { color: inherit; font-weight: 700; }
+  .badge.conok { background: var(--ok-bg); color: var(--ok-fg); }
+  .badge.espera { background: var(--warn-bg); color: var(--warn-fg); }
+  tr.row-espera { background: color-mix(in srgb, var(--warn-bg) 35%, transparent); }
 {% endblock %}
 {% block content %}
   <h1>👤 Usuarios</h1>
@@ -18,6 +23,9 @@
     <a href="{{ url_for('admin_users') }}" class="active">Usuarios</a>
     <a href="{{ url_for('admin_guia') }}">Guía de alta</a>
   </div>
+  {% if esperando %}
+  <div class="aviso-paso4">🔔 <b>{{ esperando }}</b> cliente{{ 's' if esperando != 1 }} marcó sus pasos en AFIP y espera que aceptes la delegación (tu <b>paso 4</b>). <a href="{{ url_for('admin_guia') }}">Ver guía →</a></div>
+  {% endif %}
   {% if msg %}<div class="ok" style="margin:1rem 0">{{ msg }}</div>{% endif %}
   {% if error %}<div class="error" style="margin:1rem 0">❌ {{ error }}</div>{% endif %}
 
@@ -35,14 +43,20 @@
   <p class="muted">El usuario entra con esa clave y la cambia desde "Mi cuenta".</p>
 
   <table>
-    <thead><tr><th>ID</th><th>Email</th><th>Rol</th><th>Estado</th><th>Alta</th><th></th></tr></thead>
+    <thead><tr><th>ID</th><th>Email</th><th>Rol</th><th>Estado</th><th>Conexión ARCA</th><th>Alta</th><th></th></tr></thead>
     <tbody>
       {% for u in usuarios %}
-      <tr>
+      <tr class="{{ 'row-espera' if u.cliente_marco_arca and not u.delegacion_ok and u.role != 'admin' }}">
         <td>{{ u.id }}</td>
         <td>{{ u.email }}</td>
         <td>{{ u.role }}</td>
-        <td>{% if u.activo %}<span class="badge ok" style="background:#bbf7d0;color:#166534">activo</span>{% else %}<span class="badge err" style="background:#fecaca;color:#991b1b">inactivo</span>{% endif %}</td>
+        <td>{% if u.activo %}<span class="badge conok">activo</span>{% else %}<span class="badge" style="background:var(--err-bg);color:var(--err-fg)">inactivo</span>{% endif %}</td>
+        <td>
+          {% if u.role == 'admin' %}<span class="muted">—</span>
+          {% elif u.delegacion_ok %}<span class="badge conok">✅ conectado</span>
+          {% elif u.cliente_marco_arca %}<span class="badge espera">🔔 listo para tu paso 4</span>{% if u.arca_marcado_en %}<br><small class="muted">marcó {{ u.arca_marcado_en }}</small>{% endif %}
+          {% else %}<span class="muted">⏳ esperando al cliente</span>{% endif %}
+        </td>
         <td class="muted">{{ u.created_at[0:10] }}</td>
         <td>
           <form method="post" class="inline">

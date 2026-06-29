@@ -114,6 +114,8 @@ CREATE TABLE IF NOT EXISTS tenant_config (
     categoria       TEXT DEFAULT '',
     delegacion_ok   INTEGER NOT NULL DEFAULT 0,
     onboarding_step INTEGER NOT NULL DEFAULT 0,
+    cliente_marco_arca INTEGER NOT NULL DEFAULT 0,
+    arca_marcado_en TEXT,
     created_at      TEXT NOT NULL
 )
 """
@@ -121,6 +123,7 @@ CREATE TABLE IF NOT EXISTS tenant_config (
 _TENANT_COLS = {
     "cuit", "punto_venta", "entorno", "concepto", "actividad",
     "razon_social", "categoria", "delegacion_ok", "onboarding_step",
+    "cliente_marco_arca", "arca_marcado_en",
 }
 
 
@@ -207,6 +210,12 @@ def init_db():
         conn.execute(_SCHEMA_USERS)
         conn.execute(_SCHEMA_TENANT)
         conn.execute(_SCHEMA_RECEPTORES)
+        # columnas nuevas de tenant_config (para DBs existentes)
+        tcols = _cols(conn, "tenant_config")
+        for col, ddl in (("cliente_marco_arca", "INTEGER NOT NULL DEFAULT 0"),
+                         ("arca_marcado_en", "TEXT")):
+            if col not in tcols:
+                conn.execute(f"ALTER TABLE tenant_config ADD COLUMN {col} {ddl}")
 
 
 # --- Config global (topes de categoría) -------------------------------------
@@ -264,6 +273,22 @@ def list_users():
     with _conn() as conn:
         rows = conn.execute(
             "SELECT id, email, role, activo, created_at FROM users ORDER BY id"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def list_users_estado():
+    """Usuarios + estado de onboarding (delegación / marca del cliente)."""
+    init_db()
+    with _conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT u.id, u.email, u.role, u.activo, u.created_at,
+                   t.cuit, t.punto_venta, t.delegacion_ok,
+                   t.cliente_marco_arca, t.arca_marcado_en
+            FROM users u LEFT JOIN tenant_config t ON t.user_id = u.id
+            ORDER BY u.id
+            """
         ).fetchall()
         return [dict(r) for r in rows]
 
