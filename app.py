@@ -200,6 +200,29 @@ def facturar():
     )
 
 
+@app.route("/api/padron")
+@auth.login_required
+def api_padron():
+    """Devuelve la razón social/nombre de un CUIT/CUIL (consulta al padrón de ARCA)."""
+    doc = "".join(c for c in request.args.get("doc", "") if c.isdigit())
+    if len(doc) != 11:
+        return {"error": "Ingresá un CUIT/CUIL de 11 dígitos."}
+    if not PLATFORM_CUIT:
+        return {"error": "La consulta de padrón no está configurada."}
+    cfg = db.get_tenant_config(g.user["id"]) or {}
+    try:
+        info = afip.consultar_padron(
+            doc, cfg.get("entorno", "homologacion"), PLATFORM_CERT, PLATFORM_KEY, PLATFORM_CUIT
+        )
+        return {"nombre": info["nombre"], "estado": info.get("estado")}
+    except Exception as e:  # noqa: BLE001
+        msg = str(e)
+        # No exponer errores internos de config/WSAA al usuario final.
+        if any(k in msg.lower() for k in ("autoriz", "wsaa", "login", "ssl", "timed out", "connection")):
+            return {"error": "No se pudo verificar el nombre en ARCA ahora."}
+        return {"error": msg}
+
+
 @app.route("/historial")
 @auth.login_required
 def historial():

@@ -73,6 +73,7 @@
       <div id="doc-extra" style="display:none">
         <label for="doc_nro">Número (sin guiones)</label>
         <input type="text" id="doc_nro" name="doc_nro" inputmode="numeric" autocomplete="off">
+        <small id="padron-status" class="muted" style="display:block;margin-top:.35rem;min-height:1.1em"></small>
         <label for="receptor_nombre">Nombre <span class="muted">(opcional, para tu lista)</span></label>
         <input type="text" id="receptor_nombre" name="receptor_nombre" autocomplete="off">
         <label for="cond_iva">Condición frente al IVA</label>
@@ -189,12 +190,37 @@
     // Elegir un receptor reciente rellena los campos
     const reciente = document.getElementById('reciente');
     if (reciente) reciente.addEventListener('change', () => {
-      if (!reciente.value) { docTipo.value = '99'; toggleDoc(); return; }
+      if (!reciente.value) { docTipo.value = '99'; toggleDoc(); padron.textContent=''; return; }
       const [dt, nro, cond, nombre] = reciente.value.split('|');
       docTipo.value = dt; toggleDoc();
       document.getElementById('doc_nro').value = nro || '';
       document.getElementById('receptor_nombre').value = nombre || '';
       if (cond) document.getElementById('cond_iva').value = cond;
+      padron.textContent = '';
     });
+
+    // Verificar en el padrón de ARCA la razón social/nombre del CUIT/CUIL
+    const docNro = document.getElementById('doc_nro');
+    const nomInput = document.getElementById('receptor_nombre');
+    const padron = document.getElementById('padron-status');
+    let padronTimer, padronUltimo = '';
+    function buscarPadron() {
+      const t = docTipo.value, nro = docNro.value.replace(/\D/g, '');
+      if ((t === '80' || t === '86') && nro.length === 11) {
+        if (nro === padronUltimo) return;
+        padronUltimo = nro;
+        padron.textContent = '⏳ Buscando en ARCA…'; padron.style.color = 'var(--muted)';
+        fetch('/api/padron?doc=' + nro).then(r => r.json()).then(d => {
+          if (d.nombre) {
+            padron.textContent = '✓ ' + d.nombre; padron.style.color = '#16a34a';
+            if (!nomInput.value) nomInput.value = d.nombre;
+          } else {
+            padron.textContent = '⚠️ ' + (d.error || 'No se encontró'); padron.style.color = '#b45309';
+          }
+        }).catch(() => { padron.textContent = '⚠️ No se pudo consultar el padrón.'; padron.style.color = '#b45309'; });
+      } else { padron.textContent = ''; padronUltimo = ''; }
+    }
+    docNro.addEventListener('input', () => { clearTimeout(padronTimer); padronTimer = setTimeout(buscarPadron, 500); });
+    docTipo.addEventListener('change', () => { padron.textContent = ''; padronUltimo = ''; });
   </script>
 {% endblock %}

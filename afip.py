@@ -42,6 +42,12 @@ ENDPOINTS = {
     },
 }
 
+# Padrón Constancia de Inscripción (A5): consulta razón social/nombre por CUIT.
+PADRON_WSDL = {
+    "homologacion": "https://awshomo.afip.gov.ar/sr-padron/webservices/personaServiceA5?WSDL",
+    "produccion": "https://aws.afip.gov.ar/sr-padron/webservices/personaServiceA5?WSDL",
+}
+
 AR_TZ = ZoneInfo("America/Argentina/Buenos_Aires")
 
 
@@ -220,6 +226,49 @@ def verificar_delegacion(cuit, entorno, cert_path, key_path, punto_venta,
     )
     _raise_on_errors(getattr(resp, "Errors", None))
     return {"ultimo": int(resp.CbteNro)}
+
+
+def consultar_padron(idpersona, entorno, cert_path, key_path, cuit_plataforma):
+    """
+    Consulta el padrón de ARCA (constancia A5) por CUIT/CUIL y devuelve
+    {'nombre', 'tipo_persona', 'estado'}. Requiere que el cert de la PLATAFORMA
+    esté autorizado para el servicio 'ws_sr_padron_a5'.
+    """
+    idp = "".join(c for c in str(idpersona) if c.isdigit())
+    if len(idp) != 11:
+        raise AfipError("La consulta de padrón necesita un CUIT/CUIL de 11 dígitos.")
+
+    auth = get_auth(cuit_plataforma, entorno, cert_path, key_path, service="ws_sr_padron_a5")
+    client = Client(PADRON_WSDL[entorno], transport=Transport(timeout=30, session=_session()))
+    try:
+        resp = client.service.getPersona(
+            token=auth["Token"], sign=auth["Sign"],
+            cuitRepresentada=int(cuit_plataforma), idPersona=int(idp),
+        )
+    except Exception as e:  # noqa: BLE001
+        raise AfipError(f"No se pudo consultar el padrón: {e}") from e
+
+    import zeep
+
+    d = zeep.helpers.serialize_object(resp) or {}
+    err = d.get("errorConstancia")
+    if err:
+        e = err.get("error") if isinstance(err, dict) else None
+        msg = "; ".join(e) if isinstance(e, list) else (str(e) if e else "documento no encontrado")
+        raise AfipError(f"Padrón: {msg}")
+
+    dg = d.get("datosGenerales") or {}
+    razon = (dg.get("razonSocial") or "").strip()
+    nombre = razon or (
+        (dg.get("apellido") or "").strip() + " " + (dg.get("nombre") or "").strip()
+    ).strip()
+    if not nombre:
+        raise AfipError("No se encontró el nombre para ese documento.")
+    return {
+        "nombre": nombre,
+        "tipo_persona": dg.get("tipoPersona"),
+        "estado": dg.get("estadoClave"),
+    }
 
 
 def _normalizar_fecha(fecha):
