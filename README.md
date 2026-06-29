@@ -1,16 +1,24 @@
-# Facturador ARCA 🧾
+# Factuya 🧾
 
-Aplicación web mínima, protegida con una clave, para **emitir facturas
-electrónicas en ARCA (ex-AFIP)** y llevar el control de lo facturado.
-
-Pensada para **Monotributo → Factura C a Consumidor Final**: entrás, ponés el
-monto y genera la factura con su CAE. Habla **directo** con los web services de
-ARCA (**WSAA** + **WSFEv1**), sin servicios de terceros que intermedien tus
-credenciales.
+SaaS **multiusuario** para que monotributistas **emitan Facturas C en ARCA**
+(ex-AFIP) y controlen su categoría. Cada cliente tiene su cuenta y su módulo de
+facturación; la plataforma factura en su nombre vía **delegación** (un solo
+certificado, sin guardar claves de nadie). Habla directo con los web services de
+ARCA (**WSAA** + **WSFEv1** + Padrón), sin terceros.
 
 ```
-ingresás monto → WSAA (autentica con tu certificado) → WSFEv1 (pide el CAE) → factura
+cliente entra → carga monto → WSFEv1 (Auth.Cuit = CUIT del cliente) → Factura C con CAE
 ```
+
+## 📚 Documentación
+
+- **[docs/ALTA-CLIENTE.md](docs/ALTA-CLIENTE.md)** — proceso completo de alta de un
+  cliente (pasos del admin y del cliente, autorización/delegación en AFIP,
+  troubleshooting). **Empezá por acá para sumar clientes.**
+- **[deploy/DEPLOY.md](deploy/DEPLOY.md)** — deploy en el server (Docker + Caddy) y
+  setup inicial de la plataforma (certificado, servicios WSFE y padrón).
+
+---
 
 ## Qué hace
 
