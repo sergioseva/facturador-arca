@@ -9,6 +9,7 @@ RUN pip install --no-cache-dir -r requirements.txt gunicorn
 # Código (los secretos y la base van montados, no copiados — ver compose)
 COPY app.py afip.py db.py categorias.py auth.py manage.py ./
 COPY templates ./templates
+COPY static ./static
 
 EXPOSE 5001
 

@@ -55,6 +55,19 @@ PLATFORM_KEY = os.environ.get("PLATFORM_KEY_PATH") or os.environ.get("KEY_PATH",
 PLATFORM_CUIT = os.environ.get("PLATFORM_CUIT", "")      # para mostrar en onboarding
 PLATFORM_ALIAS = os.environ.get("PLATFORM_ALIAS", "")    # alias del computador fiscal
 
+# Capturas guía del onboarding (se muestran si el archivo existe en static/).
+_GUIA_IMGS = {
+    "arca": "onboarding/arca-organismo.png",
+    "representante": "onboarding/representante.png",
+}
+
+
+def _guia_imgs():
+    return {
+        k: os.path.exists(os.path.join(app.static_folder, v))
+        for k, v in _GUIA_IMGS.items()
+    }
+
 
 @app.before_request
 def _cargar_usuario():
@@ -379,6 +392,7 @@ def onboarding():
     return render_template(
         "onboarding.html", cfg=cfg, error=error,
         platform_cuit=PLATFORM_CUIT, platform_alias=PLATFORM_ALIAS,
+        imgs=_guia_imgs(),
     )
 
 
