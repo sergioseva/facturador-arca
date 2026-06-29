@@ -1,68 +1,84 @@
 {% extends "base.html" %}
-{% block title %}Control monotributo — Facturador ARCA{% endblock %}
+{% block title %}Control monotributo — Factuya{% endblock %}
 {% block style %}
-  .destacado { background: #1e3a8a; color: #eff6ff; padding: 1.2rem 1.4rem; border-radius: 14px; margin: 1.2rem 0; }
-  .destacado small { color: #bfdbfe; }
-  .destacado b { font-size: 2rem; display: block; margin-top: .2rem; font-variant-numeric: tabular-nums; }
-  .sync { display: flex; align-items: center; gap: .8rem; margin: 1rem 0; flex-wrap: wrap; }
-  .cat-form { margin: 1.2rem 0 .4rem; display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
-  .cat-form label { font-weight: 600; font-size: .9rem; }
-  .cat-form select { width: auto; }
-  .barra { height: 12px; background: rgba(255,255,255,.18); border-radius: 999px; overflow: hidden; margin-top: .8rem; }
-  .barra-fill { height: 100%; border-radius: 999px; transition: width .4s; }
-  .barra-fill.verde { background: #22c55e; } .barra-fill.amarillo { background: #f59e0b; } .barra-fill.rojo { background: #ef4444; }
-  .cat-msg { margin-top: .7rem; font-size: .92rem; line-height: 1.45; }
-  .nota-cat { color: #888; font-size: .78rem; margin: .3rem 0 0; }
-  .link-btn { background: none; border: none; color: #60a5fa; cursor: pointer; font-size: .78rem; padding: 0 .2rem; text-decoration: underline; font-weight: 400; }
-  table.detalle { margin: .2rem 0 1rem 1.2rem; width: calc(100% - 1.2rem); font-size: .85rem; border-collapse: collapse; }
-  table.detalle th, table.detalle td { padding: .4rem .5rem; border-bottom: 1px solid #3334; text-align: left; }
-  table.detalle th { font-size: .7rem; color: #888; text-transform: uppercase; }
-  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-  details { border-bottom: 1px solid #3334; }
-  summary { display: flex; align-items: center; gap: .8rem; padding: .7rem .3rem; cursor: pointer; list-style: none; }
+  .controls { display: grid; gap: 1.1rem; margin: 1.2rem 0; }
+  .controls .row { display: flex; gap: .7rem; align-items: center; flex-wrap: wrap; }
+  .controls .lbl { font-weight: 600; font-size: .9rem; }
+  .controls select { width: auto; }
+  .controls input[type=file] { flex: 1; min-width: 180px; }
+  .feedback.ok { margin-top: .2rem; }
+  .feedback.err { margin-top: .2rem; }
+
+  .hero { background: linear-gradient(135deg, var(--primary), #4f86f7); color: #fff;
+    padding: 1.4rem 1.5rem; border-radius: var(--radius); margin: 1.2rem 0; box-shadow: 0 14px 34px -16px var(--ring); }
+  .hero small { color: rgba(255,255,255,.85); font-size: .82rem; }
+  .hero .total { font-size: 2.3rem; font-weight: 800; letter-spacing: -.02em; margin-top: .15rem; font-variant-numeric: tabular-nums; }
+  .barra { height: 12px; background: rgba(255,255,255,.22); border-radius: 999px; overflow: hidden; margin-top: 1rem; }
+  .barra-fill { height: 100%; border-radius: 999px; transition: width .5s ease; }
+  .barra-fill.verde { background: #4ade80; } .barra-fill.amarillo { background: #fbbf24; } .barra-fill.rojo { background: #f87171; }
+  .cat-msg { margin-top: .8rem; font-size: .92rem; line-height: 1.45; }
+  .cat-msg b { color: #fff; }
+
+  .nota-cat { color: var(--muted); font-size: .8rem; margin: -.3rem 0 1rem; }
+  .link-btn { background: none; border: none; color: var(--primary); cursor: pointer; font-size: .8rem; padding: 0 .2rem; text-decoration: underline; font-weight: 500; }
+
+  .leyenda { display: flex; gap: 1.2rem; font-size: .82rem; color: var(--muted); margin: 1.4rem 0 .2rem; align-items: center; }
+  .meses { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  details { border-bottom: 1px solid var(--border); }
+  details:last-child { border-bottom: none; }
+  summary { display: flex; align-items: center; gap: .8rem; padding: .85rem 1rem; cursor: pointer; list-style: none; }
+  summary:hover { background: var(--surface-2); }
   summary::-webkit-details-marker { display: none; }
-  summary::before { content: "▸"; color: #888; transition: transform .15s; }
+  summary::before { content: "▸"; color: var(--muted); transition: transform .15s; }
   details[open] summary::before { transform: rotate(90deg); }
-  .mes-nombre { font-weight: 600; min-width: 6rem; } .mes-cant { color: #888; font-size: .85rem; }
-  .mes-total { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 600; }
-  .badge.fact { background: #c7d2fe; color: #3730a3; } .badge.imp { background: #e5e7eb; color: #374151; }
-  .leyenda { display: flex; gap: 1rem; font-size: .8rem; color: #888; margin: .5rem 0 0; }
-  .origen-resumen { color: #888; font-size: .78rem; margin: -.5rem 0 .8rem 1.2rem; }
-  .ok, .err { padding: .7rem 1rem; border-radius: 8px; }
-  .err { background: #fee2e2; color: #991b1b; white-space: pre-wrap; }
+  details[open] summary { background: var(--surface-2); }
+  .mes-nombre { font-weight: 600; min-width: 6rem; text-transform: capitalize; }
+  .mes-cant { color: var(--muted); font-size: .85rem; }
+  .mes-total { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 700; }
+  table.detalle { width: 100%; font-size: .85rem; border-collapse: collapse; }
+  table.detalle th, table.detalle td { padding: .45rem 1rem; border-top: 1px solid var(--border); text-align: left; }
+  table.detalle th { font-size: .68rem; color: var(--muted); text-transform: uppercase; background: var(--surface-2); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .badge.fact { background: var(--primary-soft); color: var(--primary); }
+  .badge.imp { background: var(--surface-2); color: var(--muted); }
+  .origen-resumen { color: var(--muted); font-size: .76rem; padding: .5rem 1rem .8rem; margin: 0; }
+  .ayuda { margin-top: 2rem; }
 {% endblock %}
 {% block content %}
   <h1>📊 Control monotributo</h1>
   <p class="muted">Total de TODOS tus comprobantes (todos los puntos de venta) · entorno {{ entorno }}</p>
 
-  <form method="post" class="sync" id="form-csv" enctype="multipart/form-data">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <input type="file" name="csv" accept=".zip,.csv" id="input-csv" required style="width:auto">
-    <button type="submit" id="btn-csv">Importar ZIP / CSV</button>
-    {% if msg %}<span class="ok">{{ msg }}</span>{% endif %}
-    {% if error %}<span class="err">❌ {{ error }}</span>{% endif %}
-  </form>
+  <div class="card controls">
+    <form method="post" class="row" id="form-csv" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <span class="lbl">Importar de Mis Comprobantes:</span>
+      <input type="file" name="csv" accept=".zip,.csv" id="input-csv" required>
+      <button type="submit" id="btn-csv" class="btn-sm">Importar ZIP / CSV</button>
+    </form>
 
-  {% if info %}
-  <p class="muted">Datos cargados: {{ info.cant }} comprobantes de {{ info.pvs }} punto(s) de venta,
-    del {{ info.desde[6:8] }}/{{ info.desde[4:6] }}/{{ info.desde[0:4] }} al {{ info.hasta[6:8] }}/{{ info.hasta[4:6] }}/{{ info.hasta[0:4] }}.</p>
-  {% endif %}
+    <form method="post" class="row">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <span class="lbl">Mi categoría de monotributo:</span>
+      <select name="categoria" id="categoria" onchange="this.form.submit()">
+        <option value="">— elegir —</option>
+        {% for c, t in topes.items() %}
+        <option value="{{ c }}" {{ 'selected' if c == categoria }}>{{ c }} — hasta $ {{ t|ars }}</option>
+        {% endfor %}
+      </select>
+      <noscript><button type="submit" class="btn-sm">Guardar</button></noscript>
+    </form>
 
-  <form method="post" class="cat-form">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <label for="categoria">Mi categoría de monotributo:</label>
-    <select name="categoria" id="categoria" onchange="this.form.submit()">
-      <option value="">— elegir —</option>
-      {% for c, t in topes.items() %}
-      <option value="{{ c }}" {{ 'selected' if c == categoria }}>{{ c }} — hasta $ {{ t|ars }}</option>
-      {% endfor %}
-    </select>
-    <noscript><button type="submit">Guardar</button></noscript>
-  </form>
+    {% if msg %}<div class="feedback ok">{{ msg }}</div>{% endif %}
+    {% if error %}<div class="feedback err">❌ {{ error }}</div>{% endif %}
+    {% if info %}
+    <p class="muted" style="margin:0">Datos cargados: {{ info.cant }} comprobantes de {{ info.pvs }} punto(s) de venta,
+      del {{ info.desde[6:8] }}/{{ info.desde[4:6] }}/{{ info.desde[0:4] }} al {{ info.hasta[6:8] }}/{{ info.hasta[4:6] }}/{{ info.hasta[0:4] }}.</p>
+    {% endif %}
+  </div>
 
-  <div class="destacado">
+  <div class="hero">
     <small>Acumulado últimos 12 meses (móvil) — {{ movil12.cantidad }} comprobantes</small>
-    <b>$ {{ movil12.total|ars }}</b>
+    <div class="total">$ {{ movil12.total|ars }}</div>
     {% if cat_info %}
     <div class="barra"><div class="barra-fill {{ 'rojo' if cat_info.excedido else ('amarillo' if cat_info.pct_real >= 80 else 'verde') }}" style="width: {{ cat_info.pct }}%"></div></div>
     <div class="cat-msg">
@@ -85,11 +101,12 @@
   </p>
 
   {% if meses %}
-  <p class="leyenda">
-    <span><span class="badge fact">facturador</span> generada por esta app</span>
-    <span><span class="badge imp">importada</span> del CSV de Mis Comprobantes</span>
-  </p>
-  <p class="muted" style="margin:.3rem 0 1rem">Tocá un mes para ver el detalle ↓</p>
+  <div class="leyenda">
+    <span><span class="badge fact">facturador</span> generada por la app</span>
+    <span><span class="badge imp">importada</span> del CSV de ARCA</span>
+  </div>
+  <p class="muted" style="margin:.3rem 0 .8rem">Tocá un mes para ver el detalle ↓</p>
+  <div class="meses">
   {% for m in meses %}
   <details>
     <summary>
@@ -113,13 +130,14 @@
     <p class="origen-resumen">{{ m.n_facturador }} del facturador · {{ m.n_importada }} importada(s)</p>
   </details>
   {% endfor %}
+  </div>
   {% else %}
   <p class="muted" style="margin-top:1.5rem">Todavía no hay comprobantes. Generá facturas o importá el CSV de Mis Comprobantes.</p>
   {% endif %}
 
-  <div class="muted" style="margin-top:2rem">
-    <b style="color:#aaa">Cómo exportar el CSV de Mis Comprobantes:</b>
-    <ol style="margin:.4rem 0 0; padding-left:1.2rem; line-height:1.5">
+  <div class="card ayuda">
+    <b>Cómo exportar el CSV de Mis Comprobantes</b>
+    <ol style="margin:.5rem 0 0; padding-left:1.2rem; line-height:1.6; color:var(--muted)">
       <li>Entrá a ARCA → servicio <b>"Mis Comprobantes"</b> → <b>Emitidos</b>.</li>
       <li>Elegí el rango de fechas (ej. los últimos 12 meses) y <b>Buscar</b>.</li>
       <li>Descargá el archivo (ZIP) y subilo acá tal cual.</li>

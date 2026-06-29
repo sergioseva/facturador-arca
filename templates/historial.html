@@ -1,18 +1,18 @@
 {% extends "base.html" %}
-{% block title %}Historial — Facturador ARCA{% endblock %}
+{% block title %}Historial — Factuya{% endblock %}
 {% block style %}
   .resumen { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1rem 0 1.5rem; }
   .resumen .card { font-size: .9rem; }
   .resumen .card b { display: block; font-size: 1.2rem; }
   table { width: 100%; border-collapse: collapse; font-size: .9rem; }
-  th, td { padding: .55rem .5rem; text-align: left; border-bottom: 1px solid #3334; }
-  th { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: #888; }
+  th, td { padding: .55rem .5rem; text-align: left; border-bottom: 1px solid var(--border); }
+  th { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
   td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .badge.ok { background: #bbf7d0; color: #166534; }
   .badge.err { background: #fecaca; color: #991b1b; }
   tr.fila-error td { color: #b91c1c; }
   .msg-error { color: #b91c1c; font-size: .82rem; max-width: 320px; }
-  .cae { font-variant-numeric: tabular-nums; color: #888; }
+  .cae { font-variant-numeric: tabular-nums; color: var(--muted); }
 {% endblock %}
 {% block content %}
   <h1>📋 Historial de facturas</h1>

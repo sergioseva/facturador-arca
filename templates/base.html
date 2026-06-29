@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Facturador ARCA{% endblock %}</title>
+  <title>{% block title %}Factuya{% endblock %}</title>
   <style>
     :root {
       --bg: #f6f8fb; --surface: #ffffff; --surface-2: #f1f5f9; --border: #e6eaf0;
@@ -46,8 +46,11 @@
       backdrop-filter: saturate(160%) blur(8px); border-bottom: 1px solid var(--border); }
     header.bar .inner { max-width: 980px; margin: 0 auto; display: flex; align-items: center; gap: .4rem; padding: .7rem 1.1rem; flex-wrap: wrap; }
     .brand { display: inline-flex; align-items: center; gap: .55rem; font-weight: 800; letter-spacing: -.02em; font-size: 1.06rem; text-decoration: none; color: var(--text); }
-    .brand .mark { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px;
-      background: linear-gradient(135deg, var(--primary), #60a5fa); color: #fff; font-size: .95rem; box-shadow: var(--shadow); }
+    .brand .mark { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px;
+      background: linear-gradient(135deg, var(--primary), #60a5fa); color: #fff; font-weight: 800; font-size: 1.05rem;
+      letter-spacing: -.03em; box-shadow: 0 4px 12px -3px var(--ring); }
+    .brand .nm { font-weight: 800; }
+    .brand .nm b { color: var(--primary); }
     nav.links { display: flex; align-items: center; gap: .15rem; margin-left: 1rem; flex-wrap: wrap; }
     nav.links a { text-decoration: none; color: var(--muted); font-size: .9rem; font-weight: 500; padding: .4rem .6rem; border-radius: 8px; }
     nav.links a:hover { color: var(--text); background: var(--surface-2); }
@@ -101,7 +104,7 @@
   {% if g.user %}
   <header class="bar">
     <div class="inner">
-      <a class="brand" href="{{ url_for('facturar') }}"><span class="mark">🧾</span> Facturador<span style="color:var(--muted);font-weight:600"> ARCA</span></a>
+      <a class="brand" href="{{ url_for('facturar') }}"><span class="mark">F</span> <span class="nm">Factu<b>ya</b></span></a>
       <nav class="links">
         <a href="{{ url_for('facturar') }}">Facturar</a>
         <a href="{{ url_for('resumen') }}">Control monotributo</a>
