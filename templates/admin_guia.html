@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Admin · Guía de alta — Factuya{% endblock %}
+{% block style %}
+  .subnav { display: flex; gap: .5rem; margin-bottom: 1.2rem; }
+  .subnav a { font-size: .9rem; padding: .4rem .8rem; border-radius: 8px; text-decoration: none; color: var(--muted); border: 1px solid var(--border); }
+  .subnav a.active { background: var(--primary-soft); color: var(--primary); border-color: transparent; font-weight: 600; }
+  .plat { display: flex; gap: 1.2rem; flex-wrap: wrap; }
+  .plat .d { font-size: .85rem; color: var(--muted); }
+  .plat .v { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .flow { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 1rem 1.2rem; margin: 1rem 0 1.5rem; font-size: .9rem; line-height: 1.7; }
+  .step { display: grid; grid-template-columns: auto 1fr; gap: .9rem; margin: 1rem 0; }
+  .step .n { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #fff; flex-shrink: 0; }
+  .step .n.admin { background: var(--primary); } .step .n.cli { background: #64748b; }
+  .step h3 { margin: .15rem 0 .4rem; font-size: 1rem; }
+  .step .who { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+  .step .who.admin { color: var(--primary); } .step .who.cli { color: #64748b; }
+  .step ol, .step ul { margin: .3rem 0 0; padding-left: 1.1rem; line-height: 1.6; }
+  .chip-data { display: inline-block; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: .05rem .4rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  table.tr { width: 100%; border-collapse: collapse; font-size: .85rem; margin-top: .5rem; }
+  table.tr th, table.tr td { padding: .55rem .6rem; border: 1px solid var(--border); text-align: left; vertical-align: top; }
+  table.tr th { background: var(--surface-2); font-size: .72rem; text-transform: uppercase; color: var(--muted); }
+  code { background: var(--surface-2); padding: .05rem .3rem; border-radius: 5px; }
+  .warn { color: var(--warn-fg); }
+{% endblock %}
+{% block content %}
+  <h1>Guía de alta de clientes</h1>
+  <div class="subnav">
+    <a href="{{ url_for('admin_users') }}">Usuarios</a>
+    <a href="{{ url_for('admin_guia') }}" class="active">Guía de alta</a>
+  </div>
+
+  <div class="card">
+    <p style="margin:0 0 .6rem"><b>Modelo de delegación:</b> cada cliente te autoriza en su AFIP a facturar en su nombre, sin entregarte su certificado ni su clave. Datos que necesita el cliente para autorizarte:</p>
+    <div class="plat">
+      <div><div class="d">CUIT de la plataforma</div><div class="v">{{ platform_cuit or '—' }}</div></div>
+      <div><div class="d">Computador fiscal (alias)</div><div class="v">{{ platform_alias or '—' }}</div></div>
+    </div>
+  </div>
+
+  <div class="flow">
+    <b>Orden (importa):</b><br>
+    1. <b>Admin</b> → crea la cuenta del cliente (invitación)<br>
+    2. <b>Cliente</b> → en SU AFIP: autoriza el computador fiscal de la plataforma (WSFE)<br>
+    3. <b>Cliente</b> → en SU AFIP: crea un punto de venta "Web Services"<br>
+    4. <b>Admin</b> → en TU AFIP: acepta la delegación + confirma el vínculo del computador fiscal<br>
+    5. <b>Cliente</b> → en la app: carga datos y "Verificar conexión"<br>
+    6. <b>Cliente</b> → factura
+    <div style="color:var(--muted); margin-top:.5rem">El paso 2 (cliente autoriza) va <b>antes</b> del 4 (vos aceptás): no se puede aceptar algo que aún no existe.</div>
+  </div>
+
+  <div class="step"><div class="n admin">1</div><div>
+    <span class="who admin">Admin</span><h3>Crear la cuenta del cliente</h3>
+    En <b>Admin → Usuarios → Invitar usuario</b>: email + clave temporal (la cambia él desde "Mi cuenta"). Rol <code>user</code>.
+  </div></div>
+
+  <div class="step"><div class="n cli">2</div><div>
+    <span class="who cli">Cliente</span><h3>Autorizar el computador fiscal de la plataforma</h3>
+    Con su clave fiscal, en AFIP/ARCA:
+    <ol>
+      <li><b>Administrador de Relaciones de Clave Fiscal</b> → <b>Nueva Relación</b>.</li>
+      <li><b>Servicio</b> → <b>Facturación Electrónica</b> (WSFE).</li>
+      <li><b>Representante</b> → el computador fiscal de la plataforma: <span class="chip-data">CUIT {{ platform_cuit or '20242454600' }}</span> alias <span class="chip-data">{{ platform_alias or 'facturador' }}</span>.</li>
+      <li>Confirmar. Queda en <b>"Aceptada: Pendiente"</b> (la aceptás vos en el paso 4).</li>
+    </ol>
+  </div></div>
+
+  <div class="step"><div class="n cli">3</div><div>
+    <span class="who cli">Cliente</span><h3>Crear un punto de venta Web Service</h3>
+    <ol>
+      <li><b>Administración de puntos de venta y domicilios</b> → <b>Alta</b>.</li>
+      <li>Sistema: <b>Factura Electrónica – Web Services</b> <span class="warn">(¡no "Comprobantes en línea"!)</span>.</li>
+      <li>Anotá el número que asigna — va en el onboarding.</li>
+    </ol>
+  </div></div>
+
+  <div class="step"><div class="n admin">4</div><div>
+    <span class="who admin">Admin</span><h3>Aceptar la delegación y confirmar el vínculo</h3>
+    Con tu clave fiscal ({{ platform_cuit or '20242454600' }}):
+    <ul>
+      <li><b>a)</b> En <b>Administrador de Relaciones</b>, aceptá la <b>delegación pendiente</b> del cliente (servicio Facturación Electrónica). Pasa de <i>Pendiente</i> a <i>Aprobada</i>.</li>
+      <li><b>b)</b> Confirmá el vínculo: <b>Nueva Relación</b> con <b>Representado</b> = el cliente, <b>Servicio</b> = WSFE, <b>Representante</b> = Computador Fiscal <span class="chip-data">{{ platform_alias or 'facturador' }}</span>. Si dice <b>"la autorización ya existe"</b>, está OK — ya estaba creado.</li>
+    </ul>
+  </div></div>
+
+  <div class="step"><div class="n cli">5</div><div>
+    <span class="who cli">Cliente</span><h3>Cargar datos y verificar</h3>
+    En la app → onboarding: <b>CUIT</b>, <b>punto de venta Web Service</b> (paso 3), razón social, concepto, entorno <b>Producción</b> → <b>Guardar y verificar conexión</b> → debe dar OK.
+    <div style="color:var(--muted); font-size:.85rem; margin-top:.3rem">La verificación pide un token nuevo a ARCA, así toma la delegación recién habilitada al instante.</div>
+  </div></div>
+
+  <h3 style="margin-top:2rem">Errores frecuentes</h3>
+  <table class="tr">
+    <thead><tr><th>Error al verificar</th><th>Qué significa</th><th>Solución</th></tr></thead>
+    <tbody>
+      <tr><td><b>[600]</b> No apareció CUIT en lista de relaciones</td><td>La delegación todavía no está completa/activa.</td><td>Revisá pasos 2, 4a y 4b. Reintentá "Verificar conexión".</td></tr>
+      <tr><td><b>[11002]</b> Punto de venta no habilitado para WS</td><td>El PV cargado no es del tipo Web Service.</td><td>Usá el PV "Factura Electrónica – Web Services" (paso 3). El wizard te muestra los disponibles.</td></tr>
+      <tr><td>Computador no autorizado (WSAA)</td><td>Falta autorizar un servicio (WSFE/padrón) al computador fiscal de la plataforma.</td><td>Tarea de la plataforma, una sola vez (ver deploy/DEPLOY.md).</td></tr>
+    </tbody>
+  </table>
+{% endblock %}

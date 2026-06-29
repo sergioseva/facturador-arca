@@ -396,6 +396,14 @@ def cuenta():
 # --- admin (invite-only) ----------------------------------------------------
 
 
+@app.route("/admin/guia")
+@auth.admin_required
+def admin_guia():
+    return render_template(
+        "admin_guia.html", platform_cuit=PLATFORM_CUIT, platform_alias=PLATFORM_ALIAS
+    )
+
+
 @app.route("/admin/users", methods=["GET", "POST"])
 @auth.admin_required
 def admin_users():

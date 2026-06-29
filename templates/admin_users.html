@@ -8,9 +8,16 @@
   .acc { background: none; border: none; color: var(--primary); cursor: pointer; text-decoration: underline; font-size: .85rem; padding: 0; font-weight: 400; }
   .crear { display: grid; grid-template-columns: 1fr 1fr auto auto; gap: .6rem; align-items: end; margin: 1rem 0; }
   @media (max-width: 560px) { .crear { grid-template-columns: 1fr; } }
+  .subnav { display: flex; gap: .5rem; margin-bottom: 1.2rem; }
+  .subnav a { font-size: .9rem; padding: .4rem .8rem; border-radius: 8px; text-decoration: none; color: var(--muted); border: 1px solid var(--border); }
+  .subnav a.active { background: var(--primary-soft); color: var(--primary); border-color: transparent; font-weight: 600; }
 {% endblock %}
 {% block content %}
   <h1>👤 Usuarios</h1>
+  <div class="subnav">
+    <a href="{{ url_for('admin_users') }}" class="active">Usuarios</a>
+    <a href="{{ url_for('admin_guia') }}">Guía de alta</a>
+  </div>
   {% if msg %}<div class="ok" style="margin:1rem 0">{{ msg }}</div>{% endif %}
   {% if error %}<div class="error" style="margin:1rem 0">❌ {{ error }}</div>{% endif %}
 
