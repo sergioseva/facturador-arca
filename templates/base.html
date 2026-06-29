@@ -11,7 +11,9 @@
     a { color: #2563eb; }
     h1 { font-size: 1.4rem; }
     nav.top { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; padding: 1rem 0; border-bottom: 1px solid #8884; margin-bottom: 1.5rem; font-size: .9rem; }
-    nav.top .brand { font-weight: 700; font-size: 1.05rem; margin-right: auto; }
+    nav.top .brand { font-weight: 700; font-size: 1.05rem; }
+    nav.top .sep { margin-left: auto; }
+    nav.top .who { color: #888; font-size: .85rem; }
     nav.top a { text-decoration: none; }
     button, .btn { display: inline-block; padding: .8rem 1.1rem; font-size: 1rem; border-radius: 8px; border: none; background: #2563eb; color: #fff; cursor: pointer; font-weight: 600; text-decoration: none; }
     button:disabled { opacity: .8; cursor: progress; }
@@ -40,6 +42,7 @@
     <a href="{{ url_for('historial') }}">Historial</a>
     <a href="{{ url_for('cuenta') }}">Mi cuenta</a>
     {% if g.user.role == 'admin' %}<a href="{{ url_for('admin_users') }}">Admin</a>{% endif %}
+    <span class="sep who">👤 {{ g.user.email }}</span>
     <a href="{{ url_for('logout') }}">Salir</a>
   </nav>
   {% endif %}

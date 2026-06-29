@@ -7,6 +7,7 @@ delegación): un solo certificado, y `Auth.Cuit` = CUIT del tenant.
 """
 
 import os
+import secrets
 from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
@@ -364,6 +365,13 @@ def admin_users():
                 if u:
                     db.set_user_active(target, 0 if u["activo"] else 1)
                     msg = "Usuario actualizado."
+        elif accion == "blanquear":
+            target = int(request.form.get("user_id"))
+            u = db.get_user_by_id(target)
+            if u:
+                pw = secrets.token_urlsafe(9)
+                db.set_user_password(target, auth.hash_password(pw))
+                msg = f"Clave de {u['email']} reseteada. Clave temporal nueva: {pw}"
     return render_template("admin_users.html", usuarios=db.list_users(), msg=msg, error=error)
 
 

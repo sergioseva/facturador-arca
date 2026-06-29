@@ -5,6 +5,7 @@
   th, td { padding: .55rem .5rem; text-align: left; border-bottom: 1px solid #3334; }
   th { font-size: .72rem; text-transform: uppercase; color: #888; }
   form.inline { display: inline; }
+  .acc { background: none; border: none; color: #60a5fa; cursor: pointer; text-decoration: underline; font-size: .85rem; padding: 0; font-weight: 400; }
   .crear { display: grid; grid-template-columns: 1fr 1fr auto auto; gap: .6rem; align-items: end; margin: 1rem 0; }
   @media (max-width: 560px) { .crear { grid-template-columns: 1fr; } }
 {% endblock %}
@@ -37,12 +38,19 @@
         <td>{% if u.activo %}<span class="badge ok" style="background:#bbf7d0;color:#166534">activo</span>{% else %}<span class="badge err" style="background:#fecaca;color:#991b1b">inactivo</span>{% endif %}</td>
         <td class="muted">{{ u.created_at[0:10] }}</td>
         <td>
+          <form method="post" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="accion" value="blanquear">
+            <input type="hidden" name="user_id" value="{{ u.id }}">
+            <button type="submit" class="acc">blanquear clave</button>
+          </form>
           {% if u.id != g.user.id %}
+          ·
           <form method="post" class="inline">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="accion" value="toggle">
             <input type="hidden" name="user_id" value="{{ u.id }}">
-            <button type="submit" class="link-btn" style="background:none;border:none;color:#60a5fa;cursor:pointer;text-decoration:underline">{{ 'desactivar' if u.activo else 'activar' }}</button>
+            <button type="submit" class="acc">{{ 'desactivar' if u.activo else 'activar' }}</button>
           </form>
           {% endif %}
         </td>
