@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Facturar — Facturador ARCA{% endblock %}
 {% block style %}
-  .meta { color: #888; font-size: .9rem; margin-bottom: 1.4rem; }
-  #importe { width: 100%; padding: 1rem 1.1rem; font-size: 2rem; font-weight: 700; text-align: right;
-    border-radius: 10px; border: 1px solid #888; letter-spacing: .5px; background: inherit; color: inherit; }
+  .meta { color: var(--muted); font-size: .9rem; margin-bottom: 1.4rem; display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+  #importe { width: 100%; padding: 1rem 1.1rem 1rem 2rem; font-size: 2.1rem; font-weight: 800; text-align: right;
+    border-radius: var(--radius-sm); border: 1px solid var(--border); letter-spacing: -.01em; background: var(--surface); color: var(--text); }
   .moneda { position: relative; }
-  .moneda::before { content: "$"; position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); font-size: 1.4rem; color: #888; pointer-events: none; }
-  #btn-facturar { width: 100%; margin-top: 1rem; }
+  .moneda::before { content: "$"; position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); font-size: 1.4rem; color: var(--muted); pointer-events: none; }
+  #btn-facturar { width: 100%; margin-top: 1.2rem; padding: .9rem; font-size: 1.05rem; }
   .ok { margin-top: 1.5rem; }
   .ok h2 { margin: 0 0 .5rem; font-size: 1.1rem; }
   .ok dl { display: grid; grid-template-columns: auto 1fr; gap: .2rem .8rem; margin: 0; }
@@ -24,20 +24,22 @@
     {% else %}<span class="badge homo">HOMOLOGACIÓN (pruebas)</span>{% endif %}
   </p>
 
+  <div class="card">
   <form method="post" id="form-factura">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <label for="importe">Monto que ingresó</label>
+    <label for="importe" style="margin-top:0">Monto que ingresó</label>
     <div class="moneda">
       <input type="text" id="importe" name="importe" inputmode="decimal"
              placeholder="0,00" autocomplete="off" autofocus required>
     </div>
 
-    <label for="fecha" style="margin-top:1rem">Fecha de la factura</label>
+    <label for="fecha" style="margin-top:1.1rem">Fecha de la factura</label>
     <input type="date" id="fecha" name="fecha" value="{{ hoy }}" max="{{ hoy }}">
-    <small class="muted">Dejala en hoy, o elegí un día atrasado (hasta 10 días).</small>
+    <small class="muted" style="display:block;margin-top:.4rem">Dejala en hoy, o elegí un día atrasado (hasta 10 días).</small>
 
     <button type="submit" id="btn-facturar">Generar Factura C</button>
   </form>
+  </div>
 
   <div class="overlay" id="overlay">
     <div class="box">
