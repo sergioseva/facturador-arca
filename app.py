@@ -147,6 +147,10 @@ def facturar():
         try:
             importe = _parse_importe(request.form.get("importe", ""))
             fecha = request.form.get("fecha", "").strip() or None
+            doc_tipo = request.form.get("doc_tipo", "99").strip() or "99"
+            doc_nro = request.form.get("doc_nro", "").strip()
+            cond_iva = request.form.get("cond_iva", "").strip() or None
+            nombre = request.form.get("receptor_nombre", "").strip()
             resultado = afip.emitir_factura_c(
                 cuit=cfg["cuit"],
                 entorno=cfg["entorno"],
@@ -157,8 +161,17 @@ def facturar():
                 concepto=cfg["concepto"],
                 fecha=fecha,
                 actividad=cfg.get("actividad") or None,
+                doc_tipo=doc_tipo,
+                doc_nro=doc_nro,
+                cond_iva_receptor=cond_iva,
             )
             db.guardar(g.user["id"], resultado)
+            # recordar el receptor si quedó identificado (no Consumidor Final)
+            if resultado.get("doc_tipo") and int(resultado["doc_tipo"]) != 99:
+                db.guardar_receptor(
+                    g.user["id"], resultado["doc_tipo"], resultado["doc_nro"],
+                    nombre, int(cond_iva) if cond_iva else None,
+                )
         except (afip.AfipError, ValueError) as e:
             error = str(e)
         except Exception as e:  # noqa: BLE001
@@ -182,7 +195,8 @@ def facturar():
         "facturar.html",
         resultado=resultado, error=error,
         entorno=cfg["entorno"], punto_venta=cfg["punto_venta"], cuit=cfg["cuit"],
-        hoy=hoy,
+        hoy=hoy, receptores=db.listar_receptores(g.user["id"]),
+        doc_nombres=afip.DOC_TIPO_NOMBRES,
     )
 
 

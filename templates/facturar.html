@@ -7,6 +7,12 @@
   .moneda { position: relative; }
   .moneda::before { content: "$"; position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); font-size: 1.4rem; color: var(--muted); pointer-events: none; }
   #btn-facturar { width: 100%; margin-top: 1.2rem; padding: .9rem; font-size: 1.05rem; }
+  details.receptor { margin-top: 1.2rem; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: .2rem .9rem; }
+  details.receptor > summary { cursor: pointer; padding: .6rem 0; font-weight: 600; font-size: .92rem; list-style: none; }
+  details.receptor > summary::-webkit-details-marker { display: none; }
+  details.receptor > summary::before { content: "▸ "; color: var(--muted); }
+  details.receptor[open] > summary::before { content: "▾ "; }
+  details.receptor[open] { padding-bottom: 1rem; }
   .ok { margin-top: 1.5rem; }
   .ok h2 { margin: 0 0 .5rem; font-size: 1.1rem; }
   .ok dl { display: grid; grid-template-columns: auto 1fr; gap: .2rem .8rem; margin: 0; }
@@ -37,6 +43,47 @@
     <input type="date" id="fecha" name="fecha" value="{{ hoy }}" max="{{ hoy }}">
     <small class="muted" style="display:block;margin-top:.4rem">Dejala en hoy, o elegí un día atrasado (hasta 10 días).</small>
 
+    <details class="receptor">
+      <summary>Receptor <span class="muted">· opcional (por defecto Consumidor Final)</span></summary>
+      {% if receptores %}
+      <label for="reciente">Receptores recientes</label>
+      <select id="reciente">
+        <option value="">— nuevo / Consumidor Final —</option>
+        {% for r in receptores %}
+        <option value="{{ r.doc_tipo }}|{{ r.doc_nro }}|{{ r.cond_iva or '' }}|{{ r.nombre or '' }}">
+          {{ doc_nombres.get(r.doc_tipo, 'Doc') }} {{ r.doc_nro }}{% if r.nombre %} — {{ r.nombre }}{% endif %}
+        </option>
+        {% endfor %}
+      </select>
+      {% endif %}
+
+      <label for="doc_tipo">Tipo de documento</label>
+      <select name="doc_tipo" id="doc_tipo">
+        <option value="99">Consumidor Final (sin identificar)</option>
+        <option value="80">CUIT</option>
+        <option value="86">CUIL</option>
+        <option value="96">DNI</option>
+      </select>
+
+      <div id="doc-extra" style="display:none">
+        <label for="doc_nro">Número (sin guiones)</label>
+        <input type="text" id="doc_nro" name="doc_nro" inputmode="numeric" autocomplete="off">
+        <label for="receptor_nombre">Nombre <span class="muted">(opcional, para tu lista)</span></label>
+        <input type="text" id="receptor_nombre" name="receptor_nombre" autocomplete="off">
+        <label for="cond_iva">Condición frente al IVA</label>
+        <select name="cond_iva" id="cond_iva">
+          <option value="5">Consumidor Final</option>
+          <option value="1">IVA Responsable Inscripto</option>
+          <option value="6">Responsable Monotributo</option>
+          <option value="4">IVA Sujeto Exento</option>
+          <option value="13">Monotributista Social</option>
+          <option value="16">Monotributo Trab. Indep. Promovido</option>
+          <option value="7">Sujeto No Categorizado</option>
+          <option value="15">IVA No Alcanzado</option>
+        </select>
+      </div>
+    </details>
+
     <button type="submit" id="btn-facturar">Generar Factura C</button>
   </form>
   </div>
@@ -56,6 +103,7 @@
       <dt>Tipo</dt><dd>{{ resultado.tipo }}</dd>
       <dt>Número</dt><dd>{{ '%04d'|format(resultado.punto_venta) }}-{{ '%08d'|format(resultado.numero) }}</dd>
       <dt>Importe</dt><dd>$ {{ resultado.importe|ars }}</dd>
+      <dt>Receptor</dt><dd>{{ resultado.receptor }}</dd>
       <dt>CAE</dt><dd>{{ resultado.cae }}</dd>
       <dt>Vto. CAE</dt><dd>{{ resultado.cae_vto }}</dd>
     </dl>
@@ -84,6 +132,22 @@
       document.getElementById('overlay').style.display = 'none';
       const btn = document.getElementById('btn-facturar');
       btn.disabled = false; btn.textContent = 'Generar Factura C';
+    });
+
+    // Receptor: mostrar campos solo si no es Consumidor Final
+    const docTipo = document.getElementById('doc_tipo');
+    const docExtra = document.getElementById('doc-extra');
+    function toggleDoc() { docExtra.style.display = (docTipo.value !== '99') ? 'block' : 'none'; }
+    docTipo.addEventListener('change', toggleDoc); toggleDoc();
+    // Elegir un receptor reciente rellena los campos
+    const reciente = document.getElementById('reciente');
+    if (reciente) reciente.addEventListener('change', () => {
+      if (!reciente.value) { docTipo.value = '99'; toggleDoc(); return; }
+      const [dt, nro, cond, nombre] = reciente.value.split('|');
+      docTipo.value = dt; toggleDoc();
+      document.getElementById('doc_nro').value = nro || '';
+      document.getElementById('receptor_nombre').value = nombre || '';
+      if (cond) document.getElementById('cond_iva').value = cond;
     });
   </script>
 {% endblock %}

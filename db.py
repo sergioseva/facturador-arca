@@ -34,7 +34,22 @@ CREATE TABLE IF NOT EXISTS facturas (
     cae           TEXT,
     cae_vto       TEXT,
     observaciones TEXT,
-    error         TEXT
+    error         TEXT,
+    receptor      TEXT
+)
+"""
+
+# Receptores recientes por tenant (para reusar al facturar a los mismos).
+_SCHEMA_RECEPTORES = """
+CREATE TABLE IF NOT EXISTS receptores (
+    user_id    INTEGER NOT NULL,
+    doc_tipo   INTEGER NOT NULL,
+    doc_nro    TEXT NOT NULL,
+    nombre     TEXT,
+    cond_iva   INTEGER,
+    usos       INTEGER NOT NULL DEFAULT 0,
+    ultimo_uso TEXT,
+    PRIMARY KEY (user_id, doc_tipo, doc_nro)
 )
 """
 
@@ -175,6 +190,8 @@ def init_db():
         if "user_id" not in cols_f:
             conn.execute("ALTER TABLE facturas ADD COLUMN user_id INTEGER")
             conn.execute("UPDATE facturas SET user_id=1 WHERE user_id IS NULL")
+        if "receptor" not in cols_f:
+            conn.execute("ALTER TABLE facturas ADD COLUMN receptor TEXT")
 
         # --- tablas con user_id en el PK ---
         _migrar_user_id_pk(
@@ -189,6 +206,7 @@ def init_db():
         conn.execute(_SCHEMA_CONFIG)
         conn.execute(_SCHEMA_USERS)
         conn.execute(_SCHEMA_TENANT)
+        conn.execute(_SCHEMA_RECEPTORES)
 
 
 # --- Config global (topes de categoría) -------------------------------------
@@ -351,8 +369,8 @@ def guardar(user_id, resultado: dict) -> int:
             """
             INSERT INTO facturas
                 (user_id, emitido_en, entorno, estado, tipo, punto_venta, numero,
-                 fecha, importe, cae, cae_vto, observaciones, error)
-            VALUES (?, ?, ?, 'emitida', ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+                 fecha, importe, cae, cae_vto, observaciones, error, receptor)
+            VALUES (?, ?, ?, 'emitida', ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
             """,
             (
                 user_id,
@@ -366,9 +384,40 @@ def guardar(user_id, resultado: dict) -> int:
                 resultado["cae"],
                 resultado["cae_vto"],
                 resultado.get("observaciones", ""),
+                resultado.get("receptor"),
             ),
         )
         return cur.lastrowid
+
+
+def guardar_receptor(user_id, doc_tipo, doc_nro, nombre=None, cond_iva=None):
+    """Registra/actualiza un receptor reciente del usuario (suma 1 uso)."""
+    init_db()
+    with _conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO receptores (user_id, doc_tipo, doc_nro, nombre, cond_iva, usos, ultimo_uso)
+            VALUES (?, ?, ?, ?, ?, 1, ?)
+            ON CONFLICT(user_id, doc_tipo, doc_nro) DO UPDATE SET
+                usos = usos + 1,
+                ultimo_uso = excluded.ultimo_uso,
+                nombre = COALESCE(NULLIF(excluded.nombre, ''), receptores.nombre),
+                cond_iva = COALESCE(excluded.cond_iva, receptores.cond_iva)
+            """,
+            (user_id, int(doc_tipo), str(doc_nro), nombre or None, cond_iva, _now()),
+        )
+
+
+def listar_receptores(user_id, limite=8):
+    """Receptores del usuario, más usados recientemente primero."""
+    init_db()
+    with _conn() as conn:
+        rows = conn.execute(
+            "SELECT doc_tipo, doc_nro, nombre, cond_iva, usos FROM receptores "
+            "WHERE user_id=? ORDER BY ultimo_uso DESC LIMIT ?",
+            (user_id, limite),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 
 def registrar_error(user_id, emitido_en, entorno, importe, error) -> int:

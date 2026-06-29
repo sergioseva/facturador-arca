@@ -84,6 +84,17 @@ DOC_NRO_CONSUMIDOR_FINAL = 0
 # 5 = Consumidor Final. (Lista completa: método FEParamGetCondicionIvaReceptor.)
 COND_IVA_CONSUMIDOR_FINAL = 5
 
+# Tipos de documento del receptor (FEParamGetTiposDoc).
+DOC_TIPO_NOMBRES = {80: "CUIT", 86: "CUIL", 96: "DNI", 99: "Consumidor Final"}
+
+
+def receptor_str(doc_tipo, doc_nro):
+    """Texto legible del receptor, ej. 'CUIT 20242454600' o 'Consumidor Final'."""
+    dt = int(doc_tipo)
+    if dt == DOC_TIPO_CONSUMIDOR_FINAL:
+        return "Consumidor Final"
+    return f"{DOC_TIPO_NOMBRES.get(dt, 'Doc')} {doc_nro}"
+
 
 class AfipError(Exception):
     """Error devuelto por ARCA (o problema armando el pedido)."""
@@ -288,16 +299,33 @@ def emitir_factura_c(
     concepto=2,
     fecha=None,
     actividad=None,
+    doc_tipo=None,
+    doc_nro=None,
+    cond_iva_receptor=None,
 ):
     """
-    Emite una Factura C a Consumidor Final por `importe` (total).
-    `fecha` opcional ('AAAA-MM-DD' o None = hoy) para facturar un día atrasado.
-    `actividad` opcional (código, ej. 476110) para clasificar el comprobante.
-    Devuelve un dict con el resultado (CAE, vencimiento, número, etc.).
+    Emite una Factura C por `importe` (total).
+    Receptor opcional: por defecto Consumidor Final (doc 99). Si se pasa
+    `doc_tipo` (80=CUIT, 86=CUIL, 96=DNI) + `doc_nro`, identifica al receptor.
+    `cond_iva_receptor` (RG 5616) por defecto Consumidor Final (5).
+    Devuelve un dict con el resultado (CAE, vencimiento, número, receptor, etc.).
     """
     importe = round(float(importe), 2)
     if importe <= 0:
         raise AfipError("El importe tiene que ser mayor a 0.")
+
+    # Receptor
+    dt = int(doc_tipo) if doc_tipo else DOC_TIPO_CONSUMIDOR_FINAL
+    if dt == DOC_TIPO_CONSUMIDOR_FINAL:
+        dn, civa = DOC_NRO_CONSUMIDOR_FINAL, COND_IVA_CONSUMIDOR_FINAL
+    else:
+        dn_str = "".join(ch for ch in str(doc_nro or "") if ch.isdigit())
+        if not dn_str:
+            raise AfipError("Falta el número de documento del receptor.")
+        if dt in (80, 86) and len(dn_str) != 11:
+            raise AfipError("El CUIT/CUIL debe tener 11 dígitos.")
+        dn = int(dn_str)
+        civa = int(cond_iva_receptor) if cond_iva_receptor else COND_IVA_CONSUMIDOR_FINAL
 
     hoy = _normalizar_fecha(fecha)
 
@@ -308,9 +336,9 @@ def emitir_factura_c(
 
     detalle = {
         "Concepto": int(concepto),
-        "DocTipo": DOC_TIPO_CONSUMIDOR_FINAL,
-        "DocNro": DOC_NRO_CONSUMIDOR_FINAL,
-        "CondicionIVAReceptorId": COND_IVA_CONSUMIDOR_FINAL,
+        "DocTipo": dt,
+        "DocNro": dn,
+        "CondicionIVAReceptorId": civa,
         "CbteDesde": numero,
         "CbteHasta": numero,
         "CbteFch": hoy,
@@ -364,6 +392,9 @@ def emitir_factura_c(
         "entorno": entorno,
         "emitido_en": datetime.now(AR_TZ).isoformat(),
         "observaciones": _format_observaciones(getattr(det, "Observaciones", None)),
+        "doc_tipo": dt,
+        "doc_nro": dn,
+        "receptor": receptor_str(dt, dn),
     }
     # La persistencia la hace la ruta (con user_id); afip.py es agnóstico de usuario.
     return resultado

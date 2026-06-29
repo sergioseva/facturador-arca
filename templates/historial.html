@@ -37,7 +37,7 @@
       <tr class="{{ 'fila-error' if f.estado == 'error' }}">
         <td>{{ f.emitido_en[8:10] }}/{{ f.emitido_en[5:7] }} {{ f.emitido_en[11:16] }}</td>
         <td>{% if f.estado == 'emitida' %}<span class="badge ok">emitida</span>{% else %}<span class="badge err">error</span>{% endif %}</td>
-        <td>{% if f.estado == 'emitida' %}{{ f.tipo }} {{ '%04d'|format(f.punto_venta) }}-{{ '%08d'|format(f.numero) }}{% else %}—{% endif %}</td>
+        <td>{% if f.estado == 'emitida' %}{{ f.tipo }} {{ '%04d'|format(f.punto_venta) }}-{{ '%08d'|format(f.numero) }}{% if f.receptor and f.receptor != 'Consumidor Final' %}<br><small class="muted">{{ f.receptor }}</small>{% endif %}{% else %}—{% endif %}</td>
         <td class="num">{{ ('$ ' ~ (f.importe|ars)) if f.importe is not none else '—' }}</td>
         <td>
           {% if f.estado == 'emitida' %}
