@@ -454,6 +454,14 @@ def admin_users():
             u = db.get_user_by_id(target)
             db.upsert_tenant_config(target, admin_habilito=1)
             msg = f"Habilitaste la carga de datos para {u['email'] if u else target}."
+        elif accion == "borrar":
+            target = int(request.form.get("user_id"))
+            if target == g.user["id"]:
+                error = "No podés borrar tu propia cuenta."
+            else:
+                u = db.get_user_by_id(target)
+                db.delete_user(target)
+                msg = f"Usuario {u['email'] if u else target} borrado (cuenta y datos)."
     usuarios = db.list_users_estado()
     esperando = sum(
         1 for u in usuarios

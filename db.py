@@ -313,6 +313,16 @@ def set_user_password(uid, password_hash):
         conn.execute("UPDATE users SET password_hash=? WHERE id=?", (password_hash, uid))
 
 
+def delete_user(uid):
+    """Borra el usuario y TODOS sus datos (cuenta, config, facturas, comprobantes)."""
+    init_db()
+    with _conn() as conn:
+        for tabla in ("facturas", "arca_comprobantes", "mis_comprobantes",
+                      "receptores", "tenant_config"):
+            conn.execute(f"DELETE FROM {tabla} WHERE user_id=?", (uid,))
+        conn.execute("DELETE FROM users WHERE id=?", (uid,))
+
+
 # --- Config por tenant ------------------------------------------------------
 
 

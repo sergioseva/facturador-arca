@@ -82,6 +82,13 @@
             <input type="hidden" name="user_id" value="{{ u.id }}">
             <button type="submit" class="acc">{{ 'desactivar' if u.activo else 'activar' }}</button>
           </form>
+          ·
+          <form method="post" class="inline" onsubmit="return confirm('¿Borrar a {{ u.email }}? Se eliminan su cuenta y TODOS sus datos (facturas, comprobantes). Esto no se puede deshacer.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="accion" value="borrar">
+            <input type="hidden" name="user_id" value="{{ u.id }}">
+            <button type="submit" class="acc" style="color: var(--err-fg)">borrar</button>
+          </form>
           {% endif %}
         </td>
       </tr>
