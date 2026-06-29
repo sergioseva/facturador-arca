@@ -38,7 +38,7 @@
   <div class="card">
   <form method="post" id="form-factura" data-entorno="{{ entorno }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <label for="importe" style="margin-top:0">Monto que ingresó</label>
+    <label for="importe" style="margin-top:0">Monto a facturar</label>
     <div class="moneda">
       <input type="text" id="importe" name="importe" inputmode="decimal"
              placeholder="0,00" autocomplete="off" autofocus required>
