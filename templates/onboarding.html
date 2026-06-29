@@ -1,8 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Configurar mi facturación — ARCA{% endblock %}
 {% block style %}
-  ol.pasos { line-height: 1.6; padding-left: 1.2rem; }
-  ol.pasos li { margin-bottom: .6rem; }
+  h3 { margin-top: 1.8rem; }
+  ol.pasos { line-height: 1.6; margin: .4rem 0 0 1.6rem; padding-left: 1.2rem; list-style: lower-alpha; }
+  ol.pasos li { margin-bottom: .5rem; padding-left: .2rem; }
+  ol.pasos li::marker { color: var(--muted); font-weight: 600; }
   .destacado-cuit { background: #1f2937; color: #e5e7eb; padding: .6rem 1rem; border-radius: 8px; display: inline-block; font-variant-numeric: tabular-nums; }
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
   @media (max-width: 500px) { .grid2 { grid-template-columns: 1fr; } }

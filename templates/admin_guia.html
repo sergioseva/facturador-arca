@@ -14,7 +14,9 @@
   .step h3 { margin: .15rem 0 .4rem; font-size: 1rem; }
   .step .who { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
   .step .who.admin { color: var(--primary); } .step .who.cli { color: #64748b; }
-  .step ol, .step ul { margin: .3rem 0 0; padding-left: 1.1rem; line-height: 1.6; }
+  .step ol { margin: .3rem 0 0; padding-left: 1.2rem; line-height: 1.6; list-style: lower-alpha; }
+  .step ul { margin: .3rem 0 0; padding-left: 1.2rem; line-height: 1.6; }
+  .step ol li::marker { color: var(--muted); font-weight: 600; }
   .chip-data { display: inline-block; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: .05rem .4rem; font-weight: 700; font-variant-numeric: tabular-nums; }
   table.tr { width: 100%; border-collapse: collapse; font-size: .85rem; margin-top: .5rem; }
   table.tr th, table.tr td { padding: .55rem .6rem; border: 1px solid var(--border); text-align: left; vertical-align: top; }
