@@ -18,14 +18,19 @@
   <h1>📋 Historial de facturas</h1>
 
   <div class="resumen">
-    {% for entorno, t in totales.items() %}
+    {% for ent, t in totales.items() %}
     <div class="card">
-      <span class="badge {{ 'prod' if entorno == 'produccion' else 'homo' }}">{{ entorno }}</span>
+      <span class="badge {{ 'prod' if ent == 'produccion' else 'homo' }}">{{ ent }}</span>
       <b>{{ t.emitidas }}</b> emitida{{ 's' if t.emitidas != 1 }} · $ {{ t.total|ars }}
       {% if t.errores %}<br><span style="color:#f87171">{{ t.errores }} con error</span>{% endif %}
     </div>
     {% endfor %}
   </div>
+
+  <p class="muted" style="margin:.2rem 0 1rem">
+    Mostrando el detalle de <span class="badge {{ 'prod' if entorno == 'produccion' else 'homo' }}">{{ entorno }}</span>.
+    Las facturas de homologación son de prueba y no se mezclan con las reales (ni cuentan para el control de monotributo).
+  </p>
 
   {% if facturas %}
   <table>

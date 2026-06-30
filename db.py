@@ -572,14 +572,20 @@ def get_factura(user_id, factura_id):
         return dict(row) if row else None
 
 
-def listar(user_id, limite: int = 200):
-    """Intentos del usuario, más recientes primero."""
+def listar(user_id, limite: int = 200, entorno=None):
+    """Intentos del usuario, más recientes primero. Opcionalmente por entorno."""
     init_db()
     with _conn() as conn:
-        rows = conn.execute(
-            "SELECT * FROM facturas WHERE user_id=? ORDER BY id DESC LIMIT ?",
-            (user_id, limite),
-        ).fetchall()
+        if entorno:
+            rows = conn.execute(
+                "SELECT * FROM facturas WHERE user_id=? AND entorno=? ORDER BY id DESC LIMIT ?",
+                (user_id, entorno, limite),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM facturas WHERE user_id=? ORDER BY id DESC LIMIT ?",
+                (user_id, limite),
+            ).fetchall()
         return [dict(r) for r in rows]
 
 

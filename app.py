@@ -53,11 +53,23 @@ app.config.update(
 csrf = CSRFProtect(app)
 limiter = Limiter(get_remote_address, app=app, default_limits=[], storage_uri="memory://")
 
-# Credencial de la PLATAFORMA (computador fiscal). Un solo par para todos.
+# Credencial de la PLATAFORMA (computador fiscal). El cert se elige por entorno:
+# producción usa el cert de producción; homologación, el de homologación (ARCA
+# los registra por separado). Así cada cliente puede probar en homo antes de pasar
+# a producción real.
 PLATFORM_CERT = os.environ.get("PLATFORM_CERT_PATH") or os.environ.get("CERT_PATH", "certs/prod.crt")
 PLATFORM_KEY = os.environ.get("PLATFORM_KEY_PATH") or os.environ.get("KEY_PATH", "certs/prod.key")
+PLATFORM_CERT_HOMO = os.environ.get("PLATFORM_CERT_HOMO_PATH", "certs/homo.crt")
+PLATFORM_KEY_HOMO = os.environ.get("PLATFORM_KEY_HOMO_PATH", "certs/homo.key")
 PLATFORM_CUIT = os.environ.get("PLATFORM_CUIT", "")      # para mostrar en onboarding
 PLATFORM_ALIAS = os.environ.get("PLATFORM_ALIAS", "")    # alias del computador fiscal
+
+
+def _cert_key(entorno):
+    """(cert, key) según entorno: homologación usa su propio certificado."""
+    if entorno == "homologacion":
+        return PLATFORM_CERT_HOMO, PLATFORM_KEY_HOMO
+    return PLATFORM_CERT, PLATFORM_KEY
 
 # Capturas guía del onboarding: se suben desde el panel y se guardan en el
 # volumen de datos (persisten entre deploys). Cada "slot" es una pantalla de AFIP.
@@ -214,11 +226,12 @@ def facturar():
             cond_iva = request.form.get("cond_iva", "").strip() or None
             nombre = request.form.get("receptor_nombre", "").strip()
             cond_venta = request.form.get("condicion_venta", "").strip() or cfg.get("condicion_venta") or "Contado"
+            cert, key = _cert_key(cfg["entorno"])
             resultado = afip.emitir_factura_c(
                 cuit=cfg["cuit"],
                 entorno=cfg["entorno"],
-                cert_path=PLATFORM_CERT,
-                key_path=PLATFORM_KEY,
+                cert_path=cert,
+                key_path=key,
                 punto_venta=cfg["punto_venta"],
                 importe=importe,
                 concepto=cfg["concepto"],
@@ -282,10 +295,10 @@ def api_padron():
     if not PLATFORM_CUIT:
         return {"error": "La consulta de padrón no está configurada."}
     cfg = db.get_tenant_config(g.user["id"]) or {}
+    entorno = cfg.get("entorno", "homologacion")
+    cert, key = _cert_key(entorno)
     try:
-        info = afip.consultar_padron(
-            doc, cfg.get("entorno", "homologacion"), PLATFORM_CERT, PLATFORM_KEY, PLATFORM_CUIT
-        )
+        info = afip.consultar_padron(doc, entorno, cert, key, PLATFORM_CUIT)
         return {"nombre": info["nombre"], "estado": info.get("estado")}
     except Exception as e:  # noqa: BLE001
         msg = str(e)
@@ -298,10 +311,13 @@ def api_padron():
 @app.route("/historial")
 @auth.login_required
 def historial():
+    cfg = db.get_tenant_config(g.user["id"]) or {}
+    entorno = cfg.get("entorno", "homologacion")
     return render_template(
         "historial.html",
-        facturas=db.listar(g.user["id"]),
+        facturas=db.listar(g.user["id"], entorno=entorno),
         totales=db.totales(g.user["id"]),
+        entorno=entorno,
     )
 
 
@@ -448,8 +464,9 @@ def onboarding():
                     uid, cuit=cuit, punto_venta=int(pv), actividad=actividad or None,
                     razon_social=razon, concepto=int(concepto), entorno=entorno,
                 )
+                cert, key = _cert_key(entorno)
                 try:
-                    afip.verificar_delegacion(cuit, entorno, PLATFORM_CERT, PLATFORM_KEY, int(pv))
+                    afip.verificar_delegacion(cuit, entorno, cert, key, int(pv))
                     db.set_delegacion_ok(uid, 1)
                     return redirect(url_for("facturar"))
                 except Exception as e:  # noqa: BLE001
@@ -457,7 +474,7 @@ def onboarding():
                     msg = str(e)
                     if "11002" in msg:
                         try:
-                            pvs = afip.listar_puntos_venta(cuit, entorno, PLATFORM_CERT, PLATFORM_KEY)
+                            pvs = afip.listar_puntos_venta(cuit, entorno, cert, key)
                         except Exception:  # noqa: BLE001
                             pvs = []
                         if pvs:

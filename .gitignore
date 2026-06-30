@@ -23,3 +23,6 @@ venv/
 
 # imágenes guía subidas desde el panel
 data/onboarding/
+
+# helper local de pruebas (homologación)
+run_homo_local.py
