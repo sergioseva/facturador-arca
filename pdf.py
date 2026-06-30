@@ -15,6 +15,7 @@ COND_IVA_NOMBRES = {
     9: "Cliente del Exterior", 10: "IVA Liberado - Ley 19.640", 13: "Monotributista Social",
     15: "IVA No Alcanzado", 16: "Monotributo Trab. Indep. Promovido",
 }
+COPIAS = ("ORIGINAL", "DUPLICADO", "TRIPLICADO")
 
 
 def _ars(v):
@@ -31,7 +32,7 @@ def _s(t):
     return str(t if t is not None else "").encode("latin-1", "replace").decode("latin-1")
 
 
-def _qr_png(factura, emisor):
+def _qr_bytes(factura, emisor):
     f = str(factura["fecha"])
     data = {
         "ver": 1, "fecha": f"{f[0:4]}-{f[4:6]}-{f[6:8]}", "cuit": int(emisor["cuit"]),
@@ -42,15 +43,17 @@ def _qr_png(factura, emisor):
         "codAut": int(factura["cae"]),
     }
     b64 = base64.b64encode(json.dumps(data).encode()).decode()
-    img = qrcode.make("https://www.afip.gob.ar/fe/qr/?p=" + b64)
+    qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=10, border=2)
+    qr.add_data("https://www.afip.gob.ar/fe/qr/?p=" + b64)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    pil = (img.get_image() if hasattr(img, "get_image") else img).convert("RGB")
     buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    buf.seek(0)
-    return buf
+    pil.save(buf, format="PNG")
+    return buf.getvalue()
 
 
 def _lbl(pdf, x, y, w, label, value, h=4.6, size=8):
-    """Label en negrita + valor normal, con wrap del valor. Devuelve y final."""
     pdf.set_xy(x, y)
     pdf.set_font("helvetica", "B", size)
     lw = pdf.get_string_width(label) + 1.2
@@ -61,49 +64,47 @@ def _lbl(pdf, x, y, w, label, value, h=4.6, size=8):
     return pdf.get_y()
 
 
-def factura_pdf(factura, emisor) -> bytes:
-    pdf = FPDF(format="A4", unit="mm")
-    pdf.set_auto_page_break(False)
-    pdf.set_margins(10, 10, 10)
-    pdf.add_page()
+def _draw(pdf, factura, emisor, copia, qr_bytes):
     x0, x1 = 10, 200
-    W = x1 - x0          # 190
-    xv = x0 + 96         # divisor del encabezado
+    W = x1 - x0
+    xv = x0 + 96
 
-    # --- ORIGINAL ---
+    # --- copia (ORIGINAL / DUPLICADO / TRIPLICADO) ---
     pdf.rect(x0, 10, W, 8)
     pdf.set_xy(x0, 10)
     pdf.set_font("helvetica", "B", 12)
-    pdf.cell(W, 8, "ORIGINAL", align="C")
+    pdf.cell(W, 8, copia, align="C")
 
     # --- encabezado ---
-    hy, hh = 18, 42
+    hy, hh = 19, 42
     pdf.rect(x0, hy, W, hh)
-    pdf.line(xv, hy, xv, hy + hh)
-    # cuadro de la C
-    cw, ch = 18, 15
-    pdf.rect(xv - cw / 2, hy, cw, ch)
-    pdf.set_xy(xv - cw / 2, hy + 1.5)
-    pdf.set_font("helvetica", "B", 26)
-    pdf.cell(cw, 9, "C", align="C")
-    pdf.set_xy(xv - cw / 2, hy + 10.5)
+    pdf.line(xv, hy + 16, xv, hy + hh)  # divisor SOLO debajo de la caja C
+
+    # cuadro de la C (relleno blanco, encima de las líneas)
+    cw, ch = 16, 16
+    pdf.set_fill_color(255, 255, 255)
+    pdf.rect(xv - cw / 2, hy, cw, ch, style="DF")
+    pdf.set_xy(xv - cw / 2, hy + 1)
+    pdf.set_font("helvetica", "B", 28)
+    pdf.cell(cw, 10, "C", align="C")
+    pdf.set_xy(xv - cw / 2, hy + 11.5)
     pdf.set_font("helvetica", "", 6.5)
     pdf.cell(cw, 3, "COD. 011", align="C")
 
     # columna izquierda (emisor)
-    lw = (xv - x0) - 4
-    ly = hy + 6
-    ly = _lbl(pdf, x0 + 3, ly, xv - cw / 2 - x0 - 5, "Razón Social: ", emisor.get("razon_social", "")) + 1.5
-    ly = _lbl(pdf, x0 + 3, ly, lw, "Domicilio Comercial: ", emisor.get("domicilio", "")) + 1.5
+    cap = (xv - cw / 2) - x0 - 6   # ancho que no llega a la caja C
+    lw = (xv - x0) - 6
+    ly = hy + 5
+    ly = _lbl(pdf, x0 + 3, ly, cap, "Razón Social: ", emisor.get("razon_social", "")) + 1.5
+    ly = _lbl(pdf, x0 + 3, ly, cap, "Domicilio Comercial: ", emisor.get("domicilio", "")) + 1.5
     _lbl(pdf, x0 + 3, ly, lw, "Condición frente al IVA: ", emisor.get("condicion", "Responsable Monotributo"))
 
     # columna derecha (factura)
-    pdf.set_xy(xv + 12, hy + 2)
+    pdf.set_xy(xv + 13, hy + 2)
     pdf.set_font("helvetica", "B", 20)
-    pdf.cell(x1 - (xv + 12), 9, "FACTURA")
+    pdf.cell(x1 - (xv + 13), 9, "FACTURA")
     rw = x1 - xv - 4
     ry = hy + 13
-    # Pto de venta + Nro
     pdf.set_xy(xv + 3, ry)
     pdf.set_font("helvetica", "B", 9)
     pdf.cell(26, 5, "Punto de Venta: ")
@@ -124,7 +125,7 @@ def factura_pdf(factura, emisor) -> bytes:
     dt = int(factura.get("doc_tipo") or 99)
     doc = "-" if dt == 99 else f"{DOC_NOMBRES.get(dt, 'Doc')} {factura.get('doc_nro', '')}"
     cond = COND_IVA_NOMBRES.get(int(factura.get("cond_iva") or 5), "Consumidor Final")
-    yy = ry0 + 1.5
+    yy = ry0 + 2
     _lbl(pdf, x0 + 3, yy, xv - x0, "Doc.: ", doc)
     _lbl(pdf, xv, yy, x1 - xv, "Apellido y Nombre / Razón Social: ", factura.get("receptor_nombre", ""))
     yy += 6
@@ -133,9 +134,9 @@ def factura_pdf(factura, emisor) -> bytes:
     yy += 6
     _lbl(pdf, x0 + 3, yy, W, "Condición de venta: ", emisor.get("condicion_venta") or "Contado")
 
-    # --- detalle (tabla) ---
+    # --- detalle: encabezado de la tabla ---
     ty = ry0 + rh + 1
-    cols = [("Código", 16, "L"), ("Producto / Servicio", 54, "L"), ("Cantidad", 20, "R"),
+    cols = [("Código", 16, "C"), ("Producto / Servicio", 54, "L"), ("Cantidad", 20, "R"),
             ("U. Medida", 20, "C"), ("Precio Unit.", 26, "R"), ("% Bonif", 14, "R"),
             ("Imp. Bonif.", 18, "R"), ("Subtotal", 22, "R")]
     pdf.set_xy(x0, ty)
@@ -143,33 +144,30 @@ def factura_pdf(factura, emisor) -> bytes:
     pdf.set_fill_color(225, 228, 232)
     for nombre, w, _a in cols:
         pdf.cell(w, 6, nombre, border=1, align="C", fill=True)
-    pdf.ln(6)
-    # fila del item
+
+    # --- cuerpo (un solo rectángulo, con el item adentro y los totales abajo) ---
+    body_top = ty + 6
+    body_h = 80
+    pdf.rect(x0, body_top, W, body_h)
+    # fila del item (texto dentro del cuerpo, sin bordes internos)
     imp = float(factura["importe"])
     item = emisor.get("item_descripcion") or "Venta de productos/servicios"
-    valores = ["", item, "1,00", "unidades", _ars(imp), "0,00", "0,00", _ars(imp)]
-    pdf.set_x(x0)
+    fila = ["", item, "1,00", "unidades", _ars(imp), "0,00", "0,00", _ars(imp)]
+    pdf.set_xy(x0, body_top + 1.5)
     pdf.set_font("helvetica", "", 8)
-    for (nombre, w, a), val in zip(cols, valores):
-        pdf.cell(w, 6, _s(("  " if a == "L" else "") + val + ("  " if a == "R" else "")), align=a)
-    pdf.ln(6)
-
-    # cuerpo vacío con bordes laterales + totales
-    body_top = pdf.get_y()
-    tot_h = 26
-    body_h = 70
-    # bordes laterales del cuerpo
-    pdf.rect(x0, body_top, W, body_h)
-    # totales (abajo a la derecha)
-    pdf.set_font("helvetica", "B", 9)
-    ty2 = body_top + body_h - tot_h + 4
+    for (nombre, w, a), val in zip(cols, fila):
+        pad = "  "
+        txt = (pad if a == "L" else "") + val + (pad if a == "R" else "")
+        pdf.cell(w, 5.5, _s(txt), align=a)
+    # totales (abajo a la derecha, dentro del cuerpo)
+    ty2 = body_top + body_h - 23
     for label, val, bold in (("Subtotal: $", _ars(imp), False),
                              ("Importe Otros Tributos: $", "0,00", False),
                              ("Importe Total: $", _ars(imp), True)):
         pdf.set_font("helvetica", "B", 11 if bold else 9)
-        pdf.set_xy(x1 - 110, ty2)
+        pdf.set_xy(x1 - 112, ty2)
         pdf.cell(75, 6, label, align="R")
-        pdf.cell(35, 6, val + "  ", align="R")
+        pdf.cell(37, 6, _s(val + "  "), align="R")
         ty2 += 7
 
     # --- leyenda ---
@@ -179,11 +177,10 @@ def factura_pdf(factura, emisor) -> bytes:
         pdf.set_xy(x0, yL)
         pdf.set_font("helvetica", "I", 9)
         pdf.cell(W, 9, _s(f'"{emisor["leyenda"]}"'), align="C")
-        yL += 11
 
     # --- pie: QR + ARCA + CAE ---
-    yF = max(yL, 258)
-    pdf.image(_qr_png(factura, emisor), x=x0 + 2, y=yF, w=26)
+    yF = 258
+    pdf.image(io.BytesIO(qr_bytes), x=x0 + 2, y=yF, w=26)
     pdf.set_xy(x0 + 32, yF + 2)
     pdf.set_font("helvetica", "B", 16)
     pdf.cell(40, 7, "ARCA")
@@ -197,11 +194,11 @@ def factura_pdf(factura, emisor) -> bytes:
     pdf.cell(60, 4, "Comprobante Autorizado")
     pdf.set_xy(x0 + 32, yF + 21.5)
     pdf.set_font("helvetica", "B", 6)
-    pdf.cell(90, 3, "Esta Agencia no se responsabiliza por los datos ingresados en el detalle de la operación")
+    pdf.cell(110, 3, "Esta Agencia no se responsabiliza por los datos ingresados en el detalle de la operación")
 
-    pdf.set_xy(x0 + 80, yF)
+    pdf.set_xy(x0 + 78, yF)
     pdf.set_font("helvetica", "B", 10)
-    pdf.cell(40, 5, "Pág. 1/1", align="C")
+    pdf.cell(44, 5, "Pág. 1/1", align="C")
 
     pdf.set_xy(x1 - 80, yF + 1)
     pdf.set_font("helvetica", "B", 10)
@@ -216,4 +213,13 @@ def factura_pdf(factura, emisor) -> bytes:
         pdf.cell(W, 5, "Comprobante de prueba (homologación) - sin validez fiscal", align="C")
         pdf.set_text_color(0)
 
+
+def factura_pdf(factura, emisor) -> bytes:
+    pdf = FPDF(format="A4", unit="mm")
+    pdf.set_auto_page_break(False)
+    pdf.set_margins(10, 10, 10)
+    qr_bytes = _qr_bytes(factura, emisor)
+    for copia in COPIAS:
+        pdf.add_page()
+        _draw(pdf, factura, emisor, copia, qr_bytes)
     return bytes(pdf.output())
