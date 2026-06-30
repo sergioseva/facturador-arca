@@ -272,10 +272,19 @@ def factura_pdf_route(fid):
         abort(404)
     cfg = db.get_tenant_config(g.user["id"]) or {}
     f["concepto"] = cfg.get("concepto")
+    if f.get("doc_tipo") and int(f["doc_tipo"]) != 99 and f.get("doc_nro"):
+        r = db.get_receptor(g.user["id"], f["doc_tipo"], f["doc_nro"])
+        f["receptor_nombre"] = (r or {}).get("nombre") or ""
     emisor = {
         "cuit": cfg.get("cuit") or "",
         "razon_social": cfg.get("razon_social") or "",
         "condicion": "Responsable Monotributo",
+        "domicilio": cfg.get("domicilio_comercial") or "",
+        "ingresos_brutos": cfg.get("ingresos_brutos") or "",
+        "inicio_actividades": cfg.get("inicio_actividades") or "",
+        "condicion_venta": cfg.get("condicion_venta") or "",
+        "item_descripcion": cfg.get("item_descripcion") or "",
+        "leyenda": cfg.get("leyenda") or "",
     }
     data = pdf.factura_pdf(f, emisor)
     nombre = f"factura-C-{int(f['punto_venta']):04d}-{int(f['numero']):08d}.pdf"
@@ -444,15 +453,28 @@ def cuenta():
     uid = g.user["id"]
     msg = error = None
     if request.method == "POST":
-        actual = request.form.get("password_actual", "")
-        nueva = request.form.get("password_nueva", "")
-        if not auth.verify_password(g.user["password_hash"], actual):
-            error = "La clave actual es incorrecta."
-        elif len(nueva) < 8:
-            error = "La clave nueva debe tener al menos 8 caracteres."
+        if request.form.get("accion") == "datos":
+            db.upsert_tenant_config(
+                uid,
+                razon_social=request.form.get("razon_social", "").strip(),
+                domicilio_comercial=request.form.get("domicilio_comercial", "").strip(),
+                ingresos_brutos=request.form.get("ingresos_brutos", "").strip(),
+                inicio_actividades=request.form.get("inicio_actividades", "").strip(),
+                condicion_venta=request.form.get("condicion_venta", "").strip(),
+                item_descripcion=request.form.get("item_descripcion", "").strip(),
+                leyenda=request.form.get("leyenda", "").strip(),
+            )
+            msg = "Datos de facturación guardados."
         else:
-            db.set_user_password(uid, auth.hash_password(nueva))
-            msg = "Clave actualizada."
+            actual = request.form.get("password_actual", "")
+            nueva = request.form.get("password_nueva", "")
+            if not auth.verify_password(g.user["password_hash"], actual):
+                error = "La clave actual es incorrecta."
+            elif len(nueva) < 8:
+                error = "La clave nueva debe tener al menos 8 caracteres."
+            else:
+                db.set_user_password(uid, auth.hash_password(nueva))
+                msg = "Clave actualizada."
     return render_template(
         "cuenta.html", cfg=db.get_tenant_config(uid) or {}, msg=msg, error=error,
     )

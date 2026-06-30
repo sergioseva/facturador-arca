@@ -467,6 +467,7 @@ def emitir_factura_c(
         "observaciones": _format_observaciones(getattr(det, "Observaciones", None)),
         "doc_tipo": dt,
         "doc_nro": dn,
+        "cond_iva": civa,
         "receptor": receptor_str(dt, dn),
     }
     # La persistencia la hace la ruta (con user_id); afip.py es agnóstico de usuario.

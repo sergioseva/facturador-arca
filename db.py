@@ -37,7 +37,8 @@ CREATE TABLE IF NOT EXISTS facturas (
     error         TEXT,
     receptor      TEXT,
     doc_tipo      INTEGER,
-    doc_nro       TEXT
+    doc_nro       TEXT,
+    cond_iva      INTEGER
 )
 """
 
@@ -119,6 +120,12 @@ CREATE TABLE IF NOT EXISTS tenant_config (
     cliente_marco_arca INTEGER NOT NULL DEFAULT 0,
     arca_marcado_en TEXT,
     admin_habilito  INTEGER NOT NULL DEFAULT 0,
+    domicilio_comercial TEXT,
+    ingresos_brutos TEXT,
+    inicio_actividades  TEXT,
+    condicion_venta TEXT,
+    item_descripcion TEXT,
+    leyenda         TEXT,
     created_at      TEXT NOT NULL
 )
 """
@@ -127,6 +134,8 @@ _TENANT_COLS = {
     "cuit", "punto_venta", "entorno", "concepto", "actividad",
     "razon_social", "categoria", "delegacion_ok", "onboarding_step",
     "cliente_marco_arca", "arca_marcado_en", "admin_habilito",
+    "domicilio_comercial", "ingresos_brutos", "inicio_actividades",
+    "condicion_venta", "item_descripcion", "leyenda",
 }
 
 
@@ -202,6 +211,8 @@ def init_db():
             conn.execute("ALTER TABLE facturas ADD COLUMN doc_tipo INTEGER")
         if "doc_nro" not in cols_f:
             conn.execute("ALTER TABLE facturas ADD COLUMN doc_nro TEXT")
+        if "cond_iva" not in cols_f:
+            conn.execute("ALTER TABLE facturas ADD COLUMN cond_iva INTEGER")
 
         # --- tablas con user_id en el PK ---
         _migrar_user_id_pk(
@@ -221,7 +232,13 @@ def init_db():
         tcols = _cols(conn, "tenant_config")
         for col, ddl in (("cliente_marco_arca", "INTEGER NOT NULL DEFAULT 0"),
                          ("arca_marcado_en", "TEXT"),
-                         ("admin_habilito", "INTEGER NOT NULL DEFAULT 0")):
+                         ("admin_habilito", "INTEGER NOT NULL DEFAULT 0"),
+                         ("domicilio_comercial", "TEXT"),
+                         ("ingresos_brutos", "TEXT"),
+                         ("inicio_actividades", "TEXT"),
+                         ("condicion_venta", "TEXT"),
+                         ("item_descripcion", "TEXT"),
+                         ("leyenda", "TEXT")):
             if col not in tcols:
                 conn.execute(f"ALTER TABLE tenant_config ADD COLUMN {col} {ddl}")
 
@@ -413,8 +430,8 @@ def guardar(user_id, resultado: dict) -> int:
             INSERT INTO facturas
                 (user_id, emitido_en, entorno, estado, tipo, punto_venta, numero,
                  fecha, importe, cae, cae_vto, observaciones, error, receptor,
-                 doc_tipo, doc_nro)
-            VALUES (?, ?, ?, 'emitida', ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
+                 doc_tipo, doc_nro, cond_iva)
+            VALUES (?, ?, ?, 'emitida', ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)
             """,
             (
                 user_id,
@@ -431,6 +448,7 @@ def guardar(user_id, resultado: dict) -> int:
                 resultado.get("receptor"),
                 resultado.get("doc_tipo"),
                 str(resultado.get("doc_nro")) if resultado.get("doc_nro") is not None else None,
+                resultado.get("cond_iva"),
             ),
         )
         return cur.lastrowid
@@ -452,6 +470,16 @@ def guardar_receptor(user_id, doc_tipo, doc_nro, nombre=None, cond_iva=None):
             """,
             (user_id, int(doc_tipo), str(doc_nro), nombre or None, cond_iva, _now()),
         )
+
+
+def get_receptor(user_id, doc_tipo, doc_nro):
+    init_db()
+    with _conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM receptores WHERE user_id=? AND doc_tipo=? AND doc_nro=?",
+            (user_id, int(doc_tipo), str(doc_nro)),
+        ).fetchone()
+        return dict(row) if row else None
 
 
 def listar_receptores(user_id, limite=8):

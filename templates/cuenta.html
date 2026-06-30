@@ -17,6 +17,28 @@
   {% endif %}
   <a class="btn" href="{{ url_for('onboarding') }}">Editar datos / re-verificar conexión</a>
 
+  <h3 style="margin-top:2rem">Datos para el PDF de la factura</h3>
+  <p class="muted">Estos datos aparecen en el PDF de tus Facturas C (formato ARCA).</p>
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="accion" value="datos">
+    <label for="razon_social">Razón social / Nombre</label>
+    <input type="text" id="razon_social" name="razon_social" value="{{ cfg.razon_social or '' }}">
+    <label for="domicilio_comercial">Domicilio comercial</label>
+    <input type="text" id="domicilio_comercial" name="domicilio_comercial" value="{{ cfg.domicilio_comercial or '' }}">
+    <label for="ingresos_brutos">Ingresos Brutos</label>
+    <input type="text" id="ingresos_brutos" name="ingresos_brutos" value="{{ cfg.ingresos_brutos or '' }}" placeholder="Ej: EXENTO, o el número">
+    <label for="inicio_actividades">Fecha de inicio de actividades</label>
+    <input type="text" id="inicio_actividades" name="inicio_actividades" value="{{ cfg.inicio_actividades or '' }}" placeholder="dd/mm/aaaa">
+    <label for="condicion_venta">Condición de venta</label>
+    <input type="text" id="condicion_venta" name="condicion_venta" value="{{ cfg.condicion_venta or '' }}" placeholder="Ej: Contado, Transferencia Bancaria">
+    <label for="item_descripcion">Descripción del ítem (producto/servicio)</label>
+    <input type="text" id="item_descripcion" name="item_descripcion" value="{{ cfg.item_descripcion or '' }}" placeholder="Ej: Libros, Servicios profesionales">
+    <label for="leyenda">Leyenda (pie de la factura, opcional)</label>
+    <input type="text" id="leyenda" name="leyenda" value="{{ cfg.leyenda or '' }}" placeholder="Ej: Libros Nuevos y Usados">
+    <button type="submit" style="margin-top:1.2rem">Guardar datos</button>
+  </form>
+
   <h3 style="margin-top:2rem">Cambiar clave</h3>
   <form method="post" style="max-width:360px">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
