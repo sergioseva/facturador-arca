@@ -68,25 +68,25 @@
     <div class="card"><div class="lbl">Recibido (compras) · últ. 12 meses</div><div class="val">$ {{ recib12|ars }}</div></div>
   </div>
 
-  {% if recib12 > 0 %}
-    {% set dif12 = (emit12 - recib12) / recib12 * 100 %}
+  {% if emit12 > 0 %}
+    {% set dif12 = (recib12 - emit12) / emit12 * 100 %}
     <div class="hero {{ 'warn' if dif12 > 0 }}">
-      <small>Facturado vs. gastado (últimos 12 meses)</small>
-      <div class="total">{% if dif12 > 0 %}+{{ dif12|round|int }}%{% else %}en equilibrio{% endif %}</div>
+      <small>Recibido vs. facturado (últimos 12 meses)</small>
+      <div class="total">{% if dif12 > 0 %}+{{ dif12|round|int }}%{% else %}en regla{% endif %}</div>
       <div class="cat-msg">
         {% if dif12 > 0 %}
-          ⚠️ Facturaste <b>$ {{ (emit12 - recib12)|ars }}</b> más de lo que gastaste — un <b>{{ dif12|round|int }}%</b> por encima de tus compras.
+          ⚠️ Recibiste <b>$ {{ (recib12 - emit12)|ars }}</b> más de lo que facturaste — un <b>{{ dif12|round|int }}%</b> por encima de tus ventas. Recibir mucho más de lo que facturás puede hacer sospechar <b>ventas sin declarar</b>.
         {% else %}
-          ✓ Tus compras ($ {{ recib12|ars }}) igualan o superan tus ventas ($ {{ emit12|ars }}).
+          ✓ Facturás tanto o más de lo que recibís ($ {{ emit12|ars }} facturado vs. $ {{ recib12|ars }} recibido).
         {% endif %}
-        <br><small style="color:rgba(255,255,255,.7)">Facturar más de lo que gastás es normal (es tu margen); el dato sirve para que la diferencia no sea desproporcionada. No hay un porcentaje oficial.</small>
+        <br><small style="color:rgba(255,255,255,.7)">No hay un porcentaje oficial; es una referencia para tu control.</small>
       </div>
     </div>
-  {% elif emit12 > 0 %}
+  {% elif recib12 > 0 %}
     <div class="hero warn">
-      <small>Facturado vs. gastado (últimos 12 meses)</small>
-      <div class="total">sin compras</div>
-      <div class="cat-msg">Facturaste <b>$ {{ emit12|ars }}</b> pero no cargaste comprobantes recibidos. Importá tus compras para comparar.</div>
+      <small>Recibido vs. facturado (últimos 12 meses)</small>
+      <div class="total">sin facturar</div>
+      <div class="cat-msg">Recibiste <b>$ {{ recib12|ars }}</b> pero no hay ventas facturadas registradas en el período.</div>
     </div>
   {% endif %}
 
@@ -94,7 +94,7 @@
   <h3>Comparativo mensual</h3>
   <p class="muted" style="margin:.2rem 0 .7rem">Facturado vs. recibido, mes a mes.</p>
   <table class="comp">
-    <thead><tr><th>Mes</th><th class="num">Facturado</th><th class="num">Recibido</th><th class="num">Facturado de más</th></tr></thead>
+    <thead><tr><th>Mes</th><th class="num">Facturado</th><th class="num">Recibido</th><th class="num">Recibido de más</th></tr></thead>
     <tbody>
       {% for m in comparativo %}
       <tr>
@@ -102,17 +102,17 @@
         <td class="num">$ {{ m.emitido|ars }}</td>
         <td class="num">$ {{ m.recibido|ars }}</td>
         <td class="num">
-          {% if m.recibido > 0 %}
-            {% set dif = (m.emitido - m.recibido) / m.recibido * 100 %}
+          {% if m.emitido > 0 %}
+            {% set dif = (m.recibido - m.emitido) / m.emitido * 100 %}
             {% if dif > 0 %}<span class="pct-bajo">+{{ dif|round|int }}%</span>{% else %}<span class="pct-ok">✓</span>{% endif %}
-          {% elif m.emitido > 0 %}<span class="pct-bajo">sin compras</span>
+          {% elif m.recibido > 0 %}<span class="pct-bajo">sin facturar</span>
           {% else %}<span class="muted">—</span>{% endif %}
         </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
-  <p class="muted" style="font-size:.8rem; margin:.5rem 0 0"><b>Facturado de más</b>: cuánto facturaste por encima de lo que gastaste ese mes (en rojo). <b>✓</b> = gastaste tanto o más de lo que facturaste.</p>
+  <p class="muted" style="font-size:.8rem; margin:.5rem 0 0"><b>Recibido de más</b>: cuánto recibiste por encima de lo que facturaste ese mes (en rojo) — puede sugerir ventas sin declarar. <b>✓</b> = facturaste tanto o más de lo recibido.</p>
   {% endif %}
 
   {% if meses %}
