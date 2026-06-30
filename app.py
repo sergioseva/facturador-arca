@@ -236,7 +236,9 @@ def facturar():
                 importe=importe,
                 concepto=cfg["concepto"],
                 fecha=fecha,
-                actividad=cfg.get("actividad") or None,
+                # En homologación AFIP no tiene las actividades del emisor vinculadas
+                # (sandbox) y rechazaría con [10223]; solo se envía en producción.
+                actividad=(cfg.get("actividad") or None) if cfg["entorno"] == "produccion" else None,
                 doc_tipo=doc_tipo,
                 doc_nro=doc_nro,
                 cond_iva_receptor=cond_iva,
