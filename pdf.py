@@ -149,16 +149,23 @@ def _draw(pdf, factura, emisor, copia, qr_bytes):
     body_top = ty + 6
     body_h = 80
     pdf.rect(x0, body_top, W, body_h)
-    # fila del item (texto dentro del cuerpo, sin bordes internos)
-    imp = float(factura["importe"])
-    item = emisor.get("item_descripcion") or "Venta de productos/servicios"
-    fila = ["", item, "1,00", "unidades", _ars(imp), "0,00", "0,00", _ars(imp)]
-    pdf.set_xy(x0, body_top + 1.5)
+    imp = float(factura["importe"])  # total
+    items = factura.get("items") or [
+        {"desc": emisor.get("item_descripcion") or "Venta de productos/servicios",
+         "cant": 1, "precio": imp, "subtotal": imp}
+    ]
+    # renglones (texto dentro del cuerpo, sin bordes internos)
     pdf.set_font("helvetica", "", 8)
-    for (nombre, w, a), val in zip(cols, fila):
-        pad = "  "
-        txt = (pad if a == "L" else "") + val + (pad if a == "R" else "")
-        pdf.cell(w, 5.5, _s(txt), align=a)
+    yrow = body_top + 1.5
+    for it in items:
+        fila = ["", it.get("desc", ""), _ars(it.get("cant", 1)), "unidades",
+                _ars(it.get("precio", 0)), "0,00", "0,00", _ars(it.get("subtotal", 0))]
+        pdf.set_xy(x0, yrow)
+        for (nombre, w, a), val in zip(cols, fila):
+            pad = "  "
+            txt = (pad if a == "L" else "") + val + (pad if a == "R" else "")
+            pdf.cell(w, 5.5, _s(txt), align=a)
+        yrow += 5.5
     # totales (abajo a la derecha, dentro del cuerpo)
     ty2 = body_top + body_h - 23
     for label, val, bold in (("Subtotal: $", _ars(imp), False),

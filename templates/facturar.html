@@ -2,10 +2,18 @@
 {% block title %}Facturar — Factuya{% endblock %}
 {% block style %}
   .meta { color: var(--muted); font-size: .9rem; margin-bottom: 1.4rem; display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
-  #importe { width: 100%; padding: 1rem 1.1rem 1rem 2rem; font-size: 2.1rem; font-weight: 800; text-align: right;
-    border-radius: var(--radius-sm); border: 1px solid var(--border-strong); letter-spacing: -.01em; background: var(--field); color: var(--text); }
-  .moneda { position: relative; }
-  .moneda::before { content: "$"; position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); font-size: 1.4rem; color: var(--muted); pointer-events: none; }
+  table.items { width: 100%; border-collapse: collapse; margin-top: .3rem; }
+  table.items th { font-size: .68rem; text-transform: uppercase; color: var(--muted); text-align: left; padding: .2rem .3rem; font-weight: 700; }
+  table.items td { padding: .15rem .25rem; vertical-align: middle; }
+  table.items input { padding: .5rem .55rem; }
+  table.items .cant { width: 58px; text-align: right; }
+  table.items .precio { text-align: right; }
+  table.items td.sub { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 600; min-width: 90px; }
+  table.items th.r, table.items td.r { text-align: right; }
+  .del-item { background: none; border: none; color: var(--err-fg); cursor: pointer; font-size: 1.05rem; padding: 0 .2rem; }
+  #add-item { margin-top: .5rem; }
+  .total-row { text-align: right; margin-top: .9rem; font-size: 1.05rem; color: var(--muted); }
+  .total-row b { font-size: 1.7rem; color: var(--text); font-variant-numeric: tabular-nums; }
   #btn-facturar { width: 100%; margin-top: 1.2rem; padding: .9rem; font-size: 1.05rem; }
   details.receptor { margin-top: 1.2rem; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: .2rem .9rem; }
   details.receptor > summary { cursor: pointer; padding: .6rem 0; font-weight: 600; font-size: .92rem; list-style: none; }
@@ -38,11 +46,17 @@
   <div class="card">
   <form method="post" id="form-factura" data-entorno="{{ entorno }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <label for="importe" style="margin-top:0">Monto a facturar</label>
-    <div class="moneda">
-      <input type="text" id="importe" name="importe" inputmode="decimal"
-             placeholder="0,00" autocomplete="off" autofocus required>
-    </div>
+
+    <label style="margin-top:0">Ítems</label>
+    <table class="items">
+      <thead><tr>
+        <th>Descripción</th><th class="r">Cant.</th><th class="r">Precio unit.</th><th class="r">Subtotal</th><th></th>
+      </tr></thead>
+      <tbody id="items-body"></tbody>
+    </table>
+    <button type="button" class="btn-ghost btn-sm" id="add-item">+ Agregar ítem</button>
+    <datalist id="items-datalist">{% for it in items %}<option value="{{ it }}"></option>{% endfor %}</datalist>
+    <div class="total-row">Total: <b id="total-display">$ 0,00</b></div>
 
     <label for="fecha" style="margin-top:1.1rem">Fecha de la factura</label>
     <input type="date" id="fecha" name="fecha" value="{{ hoy }}" max="{{ hoy }}">
@@ -113,7 +127,8 @@
     <div class="box confirm">
       <h3 style="margin:0 0 .9rem">Confirmá la factura</h3>
       <dl>
-        <dt>Importe</dt><dd id="cf-importe"></dd>
+        <dt>Total</dt><dd id="cf-importe"></dd>
+        <dt>Ítems</dt><dd id="cf-items"></dd>
         <dt>Fecha</dt><dd id="cf-fecha"></dd>
         <dt>Receptor</dt><dd id="cf-receptor"></dd>
         <dt>Cond. de venta</dt><dd id="cf-cv"></dd>
@@ -145,92 +160,112 @@
   {% if error %}<div class="error">❌ {{ error }}</div>{% endif %}
 
   <script>
-    const importe = document.getElementById('importe');
-    importe.addEventListener('input', () => {
-      let v = importe.value.replace(/[^\d,]/g, '');
-      const [rawInt, ...rest] = v.split(',');
-      const intPart = rawInt.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-      const decPart = rest.length ? ',' + rest.join('').slice(0, 2) : '';
-      importe.value = intPart + decPart;
-    });
+    const ITEM_DEFAULT = {{ item_default|tojson }};
     const form = document.getElementById('form-factura');
     const modal = document.getElementById('confirm-modal');
-    // Al "Generar": en vez de enviar, mostramos el resumen para confirmar.
-    form.addEventListener('submit', (e) => {
+    const itemsBody = document.getElementById('items-body');
+
+    function parseAR(s){ s=(s||'').replace(/\./g,'').replace(',','.'); const n=parseFloat(s); return isNaN(n)?0:n; }
+    function fmtMoney(n){ return n.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+    function fmtMiles(s){ let v=s.replace(/[^\d,]/g,''); const p=v.split(','); const ip=p[0].replace(/\B(?=(\d{3})+(?!\d))/g,'.'); const dp=p.length>1?','+p.slice(1).join('').slice(0,2):''; return ip+dp; }
+
+    function recompute(){
+      let total=0;
+      itemsBody.querySelectorAll('tr').forEach(tr=>{
+        const cant=parseAR(tr.querySelector('.cant').value||'0');
+        const precio=parseAR(tr.querySelector('.precio').value||'0');
+        const sub=Math.round(cant*precio*100)/100;
+        tr.querySelector('.sub').textContent='$ '+fmtMoney(sub);
+        total+=sub;
+      });
+      document.getElementById('total-display').textContent='$ '+fmtMoney(total);
+      return total;
+    }
+
+    function addRow(desc, focus){
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td><input type="text" name="item_desc" list="items-datalist" autocomplete="off" placeholder="Descripción"></td>
+        <td><input type="text" name="item_cant" class="cant" value="1" inputmode="decimal"></td>
+        <td><input type="text" name="item_precio" class="precio" inputmode="decimal" placeholder="0,00"></td>
+        <td class="sub">$ 0,00</td>
+        <td><button type="button" class="del-item" title="Quitar">✕</button></td>`;
+      itemsBody.appendChild(tr);
+      if(desc) tr.querySelector('input[name=item_desc]').value=desc;
+      tr.querySelector('.precio').addEventListener('input',(e)=>{ e.target.value=fmtMiles(e.target.value); recompute(); });
+      tr.querySelector('.cant').addEventListener('input',recompute);
+      tr.querySelector('.del-item').addEventListener('click',()=>{ if(itemsBody.querySelectorAll('tr').length>1){ tr.remove(); recompute(); } });
+      if(focus) tr.querySelector('.precio').focus();
+      recompute();
+    }
+    document.getElementById('add-item').addEventListener('click',()=>addRow('', true));
+    addRow(ITEM_DEFAULT, true);
+
+    form.addEventListener('submit',(e)=>{
       e.preventDefault();
-      const limpio = importe.value.replace(/\./g, '').replace(',', '.');
-      if (!(parseFloat(limpio) > 0)) { alert('Ingresá un monto mayor a 0.'); return; }
-      document.getElementById('cf-importe').textContent = '$ ' + (importe.value || '0,00');
-      const f = document.getElementById('fecha').value;
-      document.getElementById('cf-fecha').textContent = f ? f.split('-').reverse().join('/') : 'hoy';
+      const total=recompute();
+      if(!(total>0)){ alert('Agregá al menos un ítem con importe mayor a 0.'); return; }
+      const filas=itemsBody.querySelectorAll('tr').length;
+      document.getElementById('cf-importe').textContent='$ '+fmtMoney(total);
+      document.getElementById('cf-items').textContent=filas+(filas===1?' ítem':' ítems');
+      const f=document.getElementById('fecha').value;
+      document.getElementById('cf-fecha').textContent=f?f.split('-').reverse().join('/'):'hoy';
       let rec;
-      if (docTipo.value === '99') { rec = 'Consumidor Final'; }
-      else {
-        const t = docTipo.options[docTipo.selectedIndex].text.split(' ')[0];
-        const nro = document.getElementById('doc_nro').value.trim();
-        const nom = document.getElementById('receptor_nombre').value.trim();
-        rec = t + ' ' + nro + (nom ? ' · ' + nom : '');
-      }
-      document.getElementById('cf-receptor').textContent = rec;
-      document.getElementById('cf-cv').textContent = document.getElementById('condicion_venta').value;
-      const prod = form.dataset.entorno === 'produccion';
-      document.getElementById('cf-entorno').textContent = prod ? 'Producción (real)' : 'Homologación (pruebas)';
-      document.getElementById('cf-warn').style.display = prod ? 'block' : 'none';
-      modal.style.display = 'flex';
+      if(docTipo.value==='99'){ rec='Consumidor Final'; }
+      else { const t=docTipo.options[docTipo.selectedIndex].text.split(' ')[0]; const nro=document.getElementById('doc_nro').value.trim(); const nom=document.getElementById('receptor_nombre').value.trim(); rec=t+' '+nro+(nom?' · '+nom:''); }
+      document.getElementById('cf-receptor').textContent=rec;
+      document.getElementById('cf-cv').textContent=document.getElementById('condicion_venta').value;
+      const prod=form.dataset.entorno==='produccion';
+      document.getElementById('cf-entorno').textContent=prod?'Producción (real)':'Homologación (pruebas)';
+      document.getElementById('cf-warn').style.display=prod?'block':'none';
+      modal.style.display='flex';
     });
-    document.getElementById('cf-cancelar').addEventListener('click', () => { modal.style.display = 'none'; });
-    document.getElementById('cf-confirmar').addEventListener('click', () => {
-      modal.style.display = 'none';
-      const btn = document.getElementById('btn-facturar');
-      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Generando…';
-      document.getElementById('overlay').style.display = 'flex';
+    document.getElementById('cf-cancelar').addEventListener('click',()=>{ modal.style.display='none'; });
+    document.getElementById('cf-confirmar').addEventListener('click',()=>{
+      modal.style.display='none';
+      const btn=document.getElementById('btn-facturar');
+      btn.disabled=true; btn.innerHTML='<span class="spinner"></span>Generando…';
+      document.getElementById('overlay').style.display='flex';
       form.submit();
     });
-    window.addEventListener('pageshow', () => {
-      document.getElementById('overlay').style.display = 'none';
-      const btn = document.getElementById('btn-facturar');
-      btn.disabled = false; btn.textContent = 'Generar Factura C';
+    window.addEventListener('pageshow',()=>{
+      document.getElementById('overlay').style.display='none';
+      const btn=document.getElementById('btn-facturar');
+      btn.disabled=false; btn.textContent='Generar Factura C';
+      recompute();
     });
 
-    // Receptor: mostrar campos solo si no es Consumidor Final
-    const docTipo = document.getElementById('doc_tipo');
-    const docExtra = document.getElementById('doc-extra');
-    function toggleDoc() { docExtra.style.display = (docTipo.value !== '99') ? 'block' : 'none'; }
-    docTipo.addEventListener('change', toggleDoc); toggleDoc();
-    // Elegir un receptor reciente rellena los campos
-    const reciente = document.getElementById('reciente');
-    if (reciente) reciente.addEventListener('change', () => {
-      if (!reciente.value) { docTipo.value = '99'; toggleDoc(); padron.textContent=''; return; }
-      const [dt, nro, cond, nombre] = reciente.value.split('|');
-      docTipo.value = dt; toggleDoc();
-      document.getElementById('doc_nro').value = nro || '';
-      document.getElementById('receptor_nombre').value = nombre || '';
-      if (cond) document.getElementById('cond_iva').value = cond;
-      padron.textContent = '';
+    // Receptor
+    const docTipo=document.getElementById('doc_tipo');
+    const docExtra=document.getElementById('doc-extra');
+    function toggleDoc(){ docExtra.style.display=(docTipo.value!=='99')?'block':'none'; }
+    docTipo.addEventListener('change',toggleDoc); toggleDoc();
+    const reciente=document.getElementById('reciente');
+    if(reciente) reciente.addEventListener('change',()=>{
+      if(!reciente.value){ docTipo.value='99'; toggleDoc(); padron.textContent=''; return; }
+      const [dt,nro,cond,nombre]=reciente.value.split('|');
+      docTipo.value=dt; toggleDoc();
+      document.getElementById('doc_nro').value=nro||'';
+      document.getElementById('receptor_nombre').value=nombre||'';
+      if(cond) document.getElementById('cond_iva').value=cond;
+      padron.textContent='';
     });
-
-    // Verificar en el padrón de ARCA la razón social/nombre del CUIT/CUIL
-    const docNro = document.getElementById('doc_nro');
-    const nomInput = document.getElementById('receptor_nombre');
-    const padron = document.getElementById('padron-status');
-    let padronTimer, padronUltimo = '';
-    function buscarPadron() {
-      const t = docTipo.value, nro = docNro.value.replace(/\D/g, '');
-      if ((t === '80' || t === '86') && nro.length === 11) {
-        if (nro === padronUltimo) return;
-        padronUltimo = nro;
-        padron.textContent = '⏳ Buscando en ARCA…'; padron.style.color = 'var(--muted)';
-        fetch('/api/padron?doc=' + nro).then(r => r.json()).then(d => {
-          if (d.nombre) {
-            padron.textContent = '✓ ' + d.nombre; padron.style.color = '#16a34a';
-            if (!nomInput.value) nomInput.value = d.nombre;
-          } else {
-            padron.textContent = '⚠️ ' + (d.error || 'No se encontró'); padron.style.color = '#b45309';
-          }
-        }).catch(() => { padron.textContent = '⚠️ No se pudo consultar el padrón.'; padron.style.color = '#b45309'; });
-      } else { padron.textContent = ''; padronUltimo = ''; }
+    const docNro=document.getElementById('doc_nro');
+    const nomInput=document.getElementById('receptor_nombre');
+    const padron=document.getElementById('padron-status');
+    let padronTimer, padronUltimo='';
+    function buscarPadron(){
+      const t=docTipo.value, nro=docNro.value.replace(/\D/g,'');
+      if((t==='80'||t==='86') && nro.length===11){
+        if(nro===padronUltimo) return;
+        padronUltimo=nro;
+        padron.textContent='⏳ Buscando en ARCA…'; padron.style.color='var(--muted)';
+        fetch('/api/padron?doc='+nro).then(r=>r.json()).then(d=>{
+          if(d.nombre){ padron.textContent='✓ '+d.nombre; padron.style.color='#16a34a'; if(!nomInput.value) nomInput.value=d.nombre; }
+          else { padron.textContent='⚠️ '+(d.error||'No se encontró'); padron.style.color='#b45309'; }
+        }).catch(()=>{ padron.textContent='⚠️ No se pudo consultar el padrón.'; padron.style.color='#b45309'; });
+      } else { padron.textContent=''; padronUltimo=''; }
     }
-    docNro.addEventListener('input', () => { clearTimeout(padronTimer); padronTimer = setTimeout(buscarPadron, 500); });
-    docTipo.addEventListener('change', () => { padron.textContent = ''; padronUltimo = ''; });
+    docNro.addEventListener('input',()=>{ clearTimeout(padronTimer); padronTimer=setTimeout(buscarPadron,500); });
+    docTipo.addEventListener('change',()=>{ padron.textContent=''; padronUltimo=''; });
   </script>
 {% endblock %}

@@ -36,11 +36,38 @@
       <option value="{{ cv }}" {{ 'selected' if cfg.condicion_venta == cv }}>{{ cv }}</option>
       {% endfor %}
     </select>
-    <label for="item_descripcion">Descripción del ítem (producto/servicio)</label>
+    <label for="item_descripcion">Ítem por defecto <span class="muted">(se carga en el primer renglón al facturar)</span></label>
     <input type="text" id="item_descripcion" name="item_descripcion" value="{{ cfg.item_descripcion or '' }}" placeholder="Ej: Libros, Servicios profesionales">
     <label for="leyenda">Leyenda (pie de la factura, opcional)</label>
     <input type="text" id="leyenda" name="leyenda" value="{{ cfg.leyenda or '' }}" placeholder="Ej: Libros Nuevos y Usados">
     <button type="submit" style="margin-top:1.2rem">Guardar datos</button>
+  </form>
+
+  <h3 style="margin-top:2rem">Ítems frecuentes</h3>
+  <p class="muted">Tus productos/servicios habituales. Aparecen como sugerencias al cargar los renglones de la factura. (También se suman solos a medida que facturás.)</p>
+  {% if items %}
+  <div class="card" style="margin-bottom:.8rem; padding:.3rem .9rem">
+    {% for it in items %}
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:.45rem 0; {{ 'border-top:1px solid var(--border);' if not loop.first }}">
+      <span>{{ it }}</span>
+      <form method="post" style="margin:0">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="accion" value="item_del">
+        <input type="hidden" name="item" value="{{ it }}">
+        <button type="submit" style="background:none;border:none;color:var(--err-fg);cursor:pointer;text-decoration:underline;font-size:.85rem">quitar</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <form method="post" style="display:flex; gap:.5rem; align-items:flex-end; flex-wrap:wrap">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="accion" value="item_add">
+    <div style="flex:1; min-width:200px; margin:0">
+      <label for="item-nuevo">Agregar ítem al catálogo</label>
+      <input type="text" id="item-nuevo" name="item" placeholder="Ej: Asesoramiento contable" required>
+    </div>
+    <button type="submit" style="margin:0">Agregar</button>
   </form>
 
   <h3 style="margin-top:2rem">Cambiar clave</h3>

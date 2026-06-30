@@ -133,6 +133,14 @@ def _parse_importe(raw):
     return raw.strip().replace(".", "").replace(",", ".")
 
 
+def _num(raw):
+    """Parsea un número en formato argentino a float (0 si vacío/inválido)."""
+    try:
+        return float(_parse_importe(raw or "0") or "0")
+    except ValueError:
+        return 0.0
+
+
 # --- auth -------------------------------------------------------------------
 
 
@@ -179,9 +187,27 @@ def facturar():
     resultado = None
     error = None
     if request.method == "POST":
-        importe = ""
+        importe = "0"
         try:
-            importe = _parse_importe(request.form.get("importe", ""))
+            # Ítems (renglones): descripción + cantidad + precio unitario.
+            descs = request.form.getlist("item_desc")
+            cants = request.form.getlist("item_cant")
+            precios = request.form.getlist("item_precio")
+            items, total = [], 0.0
+            for d, ca, pr in zip(descs, cants, precios):
+                d = d.strip()
+                cant, precio = _num(ca), _num(pr)
+                if not d and cant == 0 and precio == 0:
+                    continue
+                sub = round(cant * precio, 2)
+                items.append({"desc": d or (cfg.get("item_descripcion") or "Venta"),
+                              "cant": cant, "precio": precio, "subtotal": sub})
+                total += sub
+            total = round(total, 2)
+            if not items or total <= 0:
+                raise ValueError("Agregá al menos un ítem con importe mayor a 0.")
+            importe = str(total)
+
             fecha = request.form.get("fecha", "").strip() or None
             doc_tipo = request.form.get("doc_tipo", "99").strip() or "99"
             doc_nro = request.form.get("doc_nro", "").strip()
@@ -203,6 +229,10 @@ def facturar():
                 cond_iva_receptor=cond_iva,
             )
             resultado["condicion_venta"] = cond_venta
+            resultado["items_json"] = json.dumps(items, ensure_ascii=False)
+            resultado["item_descripcion"] = items[0]["desc"]
+            for it in items:
+                db.agregar_item(g.user["id"], it["desc"])
             resultado["id"] = db.guardar(g.user["id"], resultado)
             # recordar el receptor si quedó identificado (no Consumidor Final)
             if resultado.get("doc_tipo") and int(resultado["doc_tipo"]) != 99:
@@ -237,6 +267,8 @@ def facturar():
         doc_nombres=afip.DOC_TIPO_NOMBRES,
         condiciones=CONDICIONES_VENTA,
         cond_venta_default=cfg.get("condicion_venta") or "Contado",
+        items=db.listar_items(g.user["id"]),
+        item_default=cfg.get("item_descripcion") or "",
     )
 
 
@@ -281,6 +313,10 @@ def factura_pdf_route(fid):
         abort(404)
     cfg = db.get_tenant_config(g.user["id"]) or {}
     f["concepto"] = cfg.get("concepto")
+    try:
+        f["items"] = json.loads(f["items_json"]) if f.get("items_json") else None
+    except (ValueError, TypeError):
+        f["items"] = None
     if f.get("doc_tipo") and int(f["doc_tipo"]) != 99 and f.get("doc_nro"):
         r = db.get_receptor(g.user["id"], f["doc_tipo"], f["doc_nro"])
         f["receptor_nombre"] = (r or {}).get("nombre") or ""
@@ -474,6 +510,12 @@ def cuenta():
                 leyenda=request.form.get("leyenda", "").strip(),
             )
             msg = "Datos de facturación guardados."
+        elif request.form.get("accion") == "item_add":
+            db.agregar_item(uid, request.form.get("item", ""))
+            msg = "Ítem agregado al catálogo."
+        elif request.form.get("accion") == "item_del":
+            db.borrar_item(uid, request.form.get("item", ""))
+            msg = "Ítem eliminado."
         else:
             actual = request.form.get("password_actual", "")
             nueva = request.form.get("password_nueva", "")
@@ -486,7 +528,7 @@ def cuenta():
                 msg = "Clave actualizada."
     return render_template(
         "cuenta.html", cfg=db.get_tenant_config(uid) or {}, msg=msg, error=error,
-        condiciones=CONDICIONES_VENTA,
+        condiciones=CONDICIONES_VENTA, items=db.listar_items(uid),
     )
 
 

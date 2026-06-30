@@ -39,7 +39,18 @@ CREATE TABLE IF NOT EXISTS facturas (
     doc_tipo      INTEGER,
     doc_nro       TEXT,
     cond_iva      INTEGER,
-    condicion_venta TEXT
+    condicion_venta TEXT,
+    item_descripcion TEXT,
+    items_json    TEXT
+)
+"""
+
+# Catálogo de ítems frecuentes por tenant (para sugerir al facturar).
+_SCHEMA_ITEMS = """
+CREATE TABLE IF NOT EXISTS items (
+    user_id     INTEGER NOT NULL,
+    descripcion TEXT NOT NULL,
+    PRIMARY KEY (user_id, descripcion)
 )
 """
 
@@ -216,6 +227,10 @@ def init_db():
             conn.execute("ALTER TABLE facturas ADD COLUMN cond_iva INTEGER")
         if "condicion_venta" not in cols_f:
             conn.execute("ALTER TABLE facturas ADD COLUMN condicion_venta TEXT")
+        if "item_descripcion" not in cols_f:
+            conn.execute("ALTER TABLE facturas ADD COLUMN item_descripcion TEXT")
+        if "items_json" not in cols_f:
+            conn.execute("ALTER TABLE facturas ADD COLUMN items_json TEXT")
 
         # --- tablas con user_id en el PK ---
         _migrar_user_id_pk(
@@ -231,6 +246,7 @@ def init_db():
         conn.execute(_SCHEMA_USERS)
         conn.execute(_SCHEMA_TENANT)
         conn.execute(_SCHEMA_RECEPTORES)
+        conn.execute(_SCHEMA_ITEMS)
         # columnas nuevas de tenant_config (para DBs existentes)
         tcols = _cols(conn, "tenant_config")
         for col, ddl in (("cliente_marco_arca", "INTEGER NOT NULL DEFAULT 0"),
@@ -433,8 +449,9 @@ def guardar(user_id, resultado: dict) -> int:
             INSERT INTO facturas
                 (user_id, emitido_en, entorno, estado, tipo, punto_venta, numero,
                  fecha, importe, cae, cae_vto, observaciones, error, receptor,
-                 doc_tipo, doc_nro, cond_iva, condicion_venta)
-            VALUES (?, ?, ?, 'emitida', ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)
+                 doc_tipo, doc_nro, cond_iva, condicion_venta, item_descripcion,
+                 items_json)
+            VALUES (?, ?, ?, 'emitida', ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
@@ -453,6 +470,8 @@ def guardar(user_id, resultado: dict) -> int:
                 str(resultado.get("doc_nro")) if resultado.get("doc_nro") is not None else None,
                 resultado.get("cond_iva"),
                 resultado.get("condicion_venta"),
+                resultado.get("item_descripcion"),
+                resultado.get("items_json"),
             ),
         )
         return cur.lastrowid
@@ -473,6 +492,35 @@ def guardar_receptor(user_id, doc_tipo, doc_nro, nombre=None, cond_iva=None):
                 cond_iva = COALESCE(excluded.cond_iva, receptores.cond_iva)
             """,
             (user_id, int(doc_tipo), str(doc_nro), nombre or None, cond_iva, _now()),
+        )
+
+
+def listar_items(user_id):
+    init_db()
+    with _conn() as conn:
+        rows = conn.execute(
+            "SELECT descripcion FROM items WHERE user_id=? ORDER BY descripcion", (user_id,)
+        ).fetchall()
+        return [r["descripcion"] for r in rows]
+
+
+def agregar_item(user_id, descripcion):
+    descripcion = (descripcion or "").strip()
+    if not descripcion:
+        return
+    init_db()
+    with _conn() as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO items (user_id, descripcion) VALUES (?, ?)",
+            (user_id, descripcion),
+        )
+
+
+def borrar_item(user_id, descripcion):
+    init_db()
+    with _conn() as conn:
+        conn.execute(
+            "DELETE FROM items WHERE user_id=? AND descripcion=?", (user_id, descripcion)
         )
 
 
