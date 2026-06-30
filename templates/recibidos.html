@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Comprobantes recibidos — Factuya{% endblock %}
+{% block style %}
+  .controls { display: grid; gap: 1.1rem; margin: 1.2rem 0; }
+  .controls .row { display: flex; gap: .7rem; align-items: center; flex-wrap: wrap; }
+  .controls .lbl { font-weight: 600; font-size: .9rem; }
+  .controls input[type=file] { flex: 1; min-width: 180px; }
+  .feedback.ok, .feedback.err { margin-top: .2rem; }
+
+  .cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.2rem 0 .8rem; }
+  .cmp .card { padding: 1.1rem 1.3rem; }
+  .cmp .lbl { color: var(--muted); font-size: .8rem; }
+  .cmp .val { font-size: 1.9rem; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; margin-top: .1rem; }
+
+  .hero { background: linear-gradient(135deg, #15803d, #0d3a23); color: #fff;
+    padding: 1.4rem 1.5rem; border-radius: var(--radius); margin: .4rem 0 1.4rem;
+    box-shadow: 0 12px 30px -16px rgba(21,128,61,.55); border: 1px solid rgba(255,255,255,.08); }
+  .hero.warn { background: linear-gradient(135deg, #9a3412, #4a1d0a); box-shadow: 0 12px 30px -16px rgba(154,52,18,.55); }
+  .hero small { color: rgba(255,255,255,.85); font-size: .82rem; }
+  .hero .total { font-size: 2.3rem; font-weight: 800; letter-spacing: -.02em; margin-top: .15rem; font-variant-numeric: tabular-nums; }
+  .cat-msg { margin-top: .7rem; font-size: .92rem; line-height: 1.45; }
+  .cat-msg b { color: #fff; }
+
+  table.comp { width: 100%; border-collapse: collapse; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  table.comp th, table.comp td { padding: .6rem 1rem; text-align: left; border-top: 1px solid var(--border); }
+  table.comp th { font-size: .7rem; color: var(--muted); text-transform: uppercase; background: var(--surface-2); border-top: none; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pct-bajo { color: #b45309; font-weight: 700; } .pct-ok { color: var(--primary); font-weight: 600; }
+
+  .meses { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  details { border-bottom: 1px solid var(--border); }
+  details:last-child { border-bottom: none; }
+  summary { display: flex; align-items: center; gap: .8rem; padding: .85rem 1rem; cursor: pointer; list-style: none; }
+  summary:hover { background: var(--surface-2); }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸"; color: var(--muted); transition: transform .15s; }
+  details[open] summary::before { transform: rotate(90deg); }
+  details[open] summary { background: var(--surface-2); }
+  .mes-nombre { font-weight: 600; min-width: 6rem; text-transform: capitalize; }
+  .mes-cant { color: var(--muted); font-size: .85rem; }
+  .mes-total { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 700; }
+  table.detalle { width: 100%; font-size: .85rem; border-collapse: collapse; }
+  table.detalle th, table.detalle td { padding: .45rem 1rem; border-top: 1px solid var(--border); text-align: left; }
+  table.detalle th { font-size: .68rem; color: var(--muted); text-transform: uppercase; background: var(--surface-2); }
+  .ayuda { margin-top: 2rem; }
+{% endblock %}
+{% block content %}
+  <h1>📥 Comprobantes recibidos</h1>
+  <p class="muted">Lo que te facturaron a vos (compras y gastos), para compararlo con lo que emitís · entorno {{ entorno }}</p>
+
+  <div class="card controls">
+    <form method="post" class="row" id="form-csv" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <span class="lbl">Importar Comprobantes Recibidos:</span>
+      <input type="file" name="csv" accept=".zip,.csv" required>
+      <button type="submit" id="btn-csv" class="btn-sm">Importar ZIP / CSV</button>
+    </form>
+    {% if msg %}<div class="feedback ok">{{ msg }}</div>{% endif %}
+    {% if error %}<div class="feedback err">❌ {{ error }}</div>{% endif %}
+    {% if info %}
+    <p class="muted" style="margin:0">Datos cargados: {{ info.cant }} comprobantes de {{ info.emisores }} emisor(es),
+      del {{ info.desde[6:8] }}/{{ info.desde[4:6] }}/{{ info.desde[0:4] }} al {{ info.hasta[6:8] }}/{{ info.hasta[4:6] }}/{{ info.hasta[0:4] }}.</p>
+    {% endif %}
+  </div>
+
+  <div class="cmp">
+    <div class="card"><div class="lbl">Facturado (ventas) · últ. 12 meses</div><div class="val">$ {{ emit12|ars }}</div></div>
+    <div class="card"><div class="lbl">Recibido (compras) · últ. 12 meses</div><div class="val">$ {{ recib12|ars }}</div></div>
+  </div>
+
+  {% if ratio is not none %}
+  <div class="hero {{ 'warn' if ratio < 20 }}">
+    <small>Relación compras / ventas (últimos 12 meses)</small>
+    <div class="total">{{ ratio|round(1) }}%</div>
+    <div class="cat-msg">
+      {% if ratio < 20 %}
+        ⚠️ Tus compras son <b>bajas</b> en relación a tus ventas. Un nivel de gastos muy bajo frente a lo que facturás puede llamar la atención.
+      {% else %}
+        Tus compras representan el <b>{{ ratio|round(0)|int }}%</b> de tus ventas.
+      {% endif %}
+      <br><small style="color:rgba(255,255,255,.7)">No existe un porcentaje oficial; es solo una referencia para tu control.</small>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if comparativo %}
+  <h3>Comparativo mensual</h3>
+  <p class="muted" style="margin:.2rem 0 .7rem">Facturado vs. recibido, mes a mes.</p>
+  <table class="comp">
+    <thead><tr><th>Mes</th><th class="num">Facturado</th><th class="num">Recibido</th><th class="num">Compras/Ventas</th></tr></thead>
+    <tbody>
+      {% for m in comparativo %}
+      <tr>
+        <td style="text-transform:capitalize">{{ m.mes|mes }}</td>
+        <td class="num">$ {{ m.emitido|ars }}</td>
+        <td class="num">$ {{ m.recibido|ars }}</td>
+        <td class="num">
+          {% if m.emitido %}{% set p = (m.recibido / m.emitido * 100) %}<span class="{{ 'pct-bajo' if p < 20 else 'pct-ok' }}">{{ p|round(0)|int }}%</span>{% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  {% if meses %}
+  <h3 style="margin-top:1.8rem">Detalle de recibidos por mes</h3>
+  <p class="muted" style="margin:.2rem 0 .8rem">Tocá un mes para ver el detalle ↓</p>
+  <div class="meses">
+  {% for m in meses %}
+  <details>
+    <summary>
+      <span class="mes-nombre">{{ m.mes|mes }}</span>
+      <span class="mes-cant">{{ m.cantidad }} comp.</span>
+      <span class="mes-total">$ {{ m.total|ars }}</span>
+    </summary>
+    <table class="detalle">
+      <thead><tr><th>Fecha</th><th>Comprobante</th><th>Emisor</th><th class="num">Importe</th></tr></thead>
+      <tbody>
+        {% for c in m.comprobantes %}
+        <tr>
+          <td>{{ c.fecha[6:8] }}/{{ c.fecha[4:6] }}/{{ c.fecha[0:4] }}</td>
+          <td>{{ c.tipo }} {{ '%04d'|format(c.punto_venta) }}-{{ '%08d'|format(c.numero) }}</td>
+          <td>{{ c.emisor }}</td>
+          <td class="num">$ {{ c.importe|ars }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
+  {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted" style="margin-top:1.5rem">Todavía no importaste comprobantes recibidos. Subí el CSV/ZIP de <b>Mis Comprobantes → Recibidos</b>.</p>
+  {% endif %}
+
+  <div class="card ayuda">
+    <b>Cómo exportar Comprobantes Recibidos</b>
+    <ol style="margin:.5rem 0 0; padding-left:1.2rem; line-height:1.6; color:var(--muted)">
+      <li>Entrá a ARCA → servicio <b>"Mis Comprobantes"</b> → <b>Recibidos</b>.</li>
+      <li>Elegí el rango de fechas (ej. los últimos 12 meses) y <b>Buscar</b>.</li>
+      <li>Descargá el archivo (ZIP) y subilo acá tal cual.</li>
+    </ol>
+  </div>
+
+  <script>
+    document.getElementById('form-csv').addEventListener('submit', () => {
+      const b = document.getElementById('btn-csv'); b.disabled = true; b.innerHTML = '<span class="spinner"></span>Importando…';
+    });
+  </script>
+{% endblock %}

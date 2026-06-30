@@ -509,6 +509,53 @@ def resumen():
     )
 
 
+@app.route("/recibidos", methods=["GET", "POST"])
+@auth.login_required
+def recibidos():
+    uid = g.user["id"]
+    cfg = db.get_tenant_config(uid) or {}
+    entorno = cfg.get("entorno", "homologacion")
+    msg = error = None
+
+    if request.method == "POST":
+        archivo = request.files.get("csv")
+        if not archivo or not archivo.filename:
+            error = "Elegí el archivo CSV/ZIP de Comprobantes Recibidos."
+        else:
+            try:
+                r = db.importar_recibidos(uid, archivo.read())
+                if r.get("error"):
+                    error = r["error"]
+                else:
+                    rango = ""
+                    if r["desde"]:
+                        rango = f" (del {r['desde'][6:8]}/{r['desde'][4:6]}/{r['desde'][0:4]} al {r['hasta'][6:8]}/{r['hasta'][4:6]}/{r['hasta'][0:4]})"
+                    msg = f"Importados {r['importados']} comprobantes recibidos{rango}."
+            except Exception as e:  # noqa: BLE001
+                error = f"No pude procesar el archivo: {e}"
+
+    hace_12 = (datetime.now(afip.AR_TZ) - timedelta(days=365)).strftime("%Y%m%d")
+    emit = db.resumen_detallado(uid, entorno, hace_12)
+    recib = db.resumen_recibidos(uid, hace_12)
+    comp = {}
+    for m in emit["meses"]:
+        comp[m["mes"]] = {"mes": m["mes"], "emitido": m["total"], "recibido": 0.0}
+    for m in recib["meses"]:
+        comp.setdefault(m["mes"], {"mes": m["mes"], "emitido": 0.0, "recibido": 0.0})["recibido"] = m["total"]
+    comparativo = [comp[k] for k in sorted(comp, reverse=True)]
+    emit12 = emit["movil"]["total"]
+    recib12 = recib["movil"]["total"]
+    ratio = (recib12 / emit12 * 100) if emit12 else None
+
+    return render_template(
+        "recibidos.html",
+        comparativo=comparativo, meses=recib["meses"],
+        info=db.info_recibidos(uid), entorno=entorno,
+        emit12=emit12, recib12=recib12, ratio=ratio,
+        msg=msg, error=error,
+    )
+
+
 # --- onboarding -------------------------------------------------------------
 
 

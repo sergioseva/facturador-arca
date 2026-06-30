@@ -114,6 +114,7 @@
       <nav class="links">
         <a href="{{ url_for('facturar') }}">Facturar</a>
         <a href="{{ url_for('resumen') }}">Control monotributo</a>
+        <a href="{{ url_for('recibidos') }}">Recibidos</a>
         <a href="{{ url_for('historial') }}">Historial</a>
         <a href="{{ url_for('cuenta') }}">Mi cuenta</a>
         {% if g.user.role == 'admin' %}<a href="{{ url_for('admin_users') }}">Admin</a>{% endif %}

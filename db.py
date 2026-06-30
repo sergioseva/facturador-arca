@@ -96,6 +96,33 @@ CREATE TABLE IF NOT EXISTS mis_comprobantes (
 )
 """
 
+# Comprobantes RECIBIDOS (compras): los que otros me emitieron a mí.
+_SCHEMA_RECIBIDOS = """
+CREATE TABLE IF NOT EXISTS comprobantes_recibidos (
+    user_id       INTEGER NOT NULL,
+    fecha         TEXT NOT NULL,       -- yyyymmdd
+    tipo          INTEGER NOT NULL,    -- código de comprobante
+    punto_venta   INTEGER NOT NULL,
+    numero        INTEGER NOT NULL,
+    emisor_doc    TEXT NOT NULL,       -- CUIT del que me facturó
+    emisor_nombre TEXT,
+    importe       REAL NOT NULL,       -- con signo (NC restan)
+    PRIMARY KEY (user_id, emisor_doc, tipo, punto_venta, numero)
+)
+"""
+
+# Nombres de tipos de comprobante (códigos AFIP) y cuáles son notas de crédito.
+CBTE_TIPO_NOMBRES = {
+    1: "Factura A", 2: "Nota de Débito A", 3: "Nota de Crédito A",
+    6: "Factura B", 7: "Nota de Débito B", 8: "Nota de Crédito B",
+    11: "Factura C", 12: "Nota de Débito C", 13: "Nota de Crédito C",
+    15: "Recibo C", 51: "Factura M", 52: "Nota de Débito M", 53: "Nota de Crédito M",
+    81: "Tique Factura A", 82: "Tique Factura B", 83: "Tique",
+    111: "Tique Factura C", 118: "Tique Nota de Crédito", 201: "Factura de Crédito MiPyME A",
+    206: "Factura de Crédito MiPyME B", 211: "Factura de Crédito MiPyME C",
+}
+CBTE_NC = {3, 8, 13, 21, 53, 110, 119, 203, 208, 213, 119}  # notas de crédito (restan)
+
 # Config GLOBAL de la plataforma (topes de categoría, iguales para todos).
 _SCHEMA_CONFIG = """
 CREATE TABLE IF NOT EXISTS config (
@@ -247,6 +274,7 @@ def init_db():
         conn.execute(_SCHEMA_TENANT)
         conn.execute(_SCHEMA_RECEPTORES)
         conn.execute(_SCHEMA_ITEMS)
+        conn.execute(_SCHEMA_RECIBIDOS)
         # columnas nuevas de tenant_config (para DBs existentes)
         tcols = _cols(conn, "tenant_config")
         for col, ddl in (("cliente_marco_arca", "INTEGER NOT NULL DEFAULT 0"),
@@ -826,4 +854,141 @@ def resumen_detallado(user_id, entorno, fecha_movil):
     return {
         "meses": meses_ordenados,
         "movil": {"total": sum(c["importe"] for c in movil), "cantidad": len(movil)},
+    }
+
+
+def importar_recibidos(user_id, contenido: bytes):
+    """Parsea el ZIP/CSV de 'Mis Comprobantes - Recibidos' (compras) y lo guarda."""
+    init_db()
+
+    if contenido[:2] == b"PK":
+        try:
+            with zipfile.ZipFile(io.BytesIO(contenido)) as z:
+                csvs = [n for n in z.namelist() if n.lower().endswith(".csv")]
+                if not csvs:
+                    return {"error": "El ZIP no contiene ningún archivo .csv."}
+                contenido = z.read(csvs[0])
+        except zipfile.BadZipFile:
+            return {"error": "El archivo parece un ZIP pero está dañado."}
+
+    for enc in ("utf-8-sig", "utf-8", "latin-1"):
+        try:
+            texto = contenido.decode(enc)
+            break
+        except UnicodeDecodeError:
+            continue
+    else:
+        return {"error": "No pude leer el archivo (codificación desconocida)."}
+
+    primera = texto.splitlines()[0] if texto.strip() else ""
+    sep = ";" if primera.count(";") >= primera.count(",") else ","
+    filas = list(csv.reader(io.StringIO(texto), delimiter=sep))
+    if not filas:
+        return {"error": "El archivo está vacío."}
+
+    cab = {_norm(c): i for i, c in enumerate(filas[0])}
+
+    def col(*nombres):
+        for n in nombres:
+            if _norm(n) in cab:
+                return cab[_norm(n)]
+        return None
+
+    i_fecha = col("Fecha de Emisión", "Fecha", "Fecha Emision")
+    i_tipo = col("Tipo de Comprobante", "Tipo")
+    i_pv = col("Punto de Venta", "Punto Venta")
+    i_num = col("Número Desde", "Numero Desde", "Número", "Numero")
+    i_emi_doc = col("Nro. Doc. Emisor", "Nro Doc Emisor", "Nro. Doc. Emisor")
+    i_emi_nom = col("Denominación Emisor", "Denominacion Emisor")
+    i_imp = col("Imp. Total", "Importe Total", "Imp Total")
+
+    if i_fecha is None or i_imp is None or i_emi_doc is None:
+        return {
+            "error": "El CSV no tiene las columnas esperadas (Fecha de Emisión / Nro. Doc. "
+            "Emisor / Imp. Total). ¿Exportaste 'Comprobantes Recibidos' de Mis Comprobantes?"
+        }
+
+    registros, leidas, ignoradas = [], 0, 0
+    for fila in filas[1:]:
+        if not fila or len(fila) <= i_imp:
+            continue
+        fecha = _parse_fecha(fila[i_fecha])
+        if not fecha:
+            ignoradas += 1
+            continue
+        try:
+            tipo = int(_parse_num(fila[i_tipo])) if i_tipo is not None else 0
+        except (ValueError, TypeError):
+            tipo = 0
+        pv = int(_parse_num(fila[i_pv])) if i_pv is not None else 0
+        numero = int(_parse_num(fila[i_num])) if i_num is not None else leidas + 1
+        emi_doc = "".join(c for c in (fila[i_emi_doc] or "") if c.isdigit())
+        emi_nom = fila[i_emi_nom].strip() if i_emi_nom is not None else ""
+        importe = _parse_num(fila[i_imp])
+        if tipo in CBTE_NC:
+            importe = -abs(importe)
+        registros.append((user_id, fecha, tipo, pv, numero, emi_doc, emi_nom, importe))
+        leidas += 1
+
+    if registros:
+        with _conn() as conn:
+            conn.executemany(
+                "INSERT OR REPLACE INTO comprobantes_recibidos "
+                "(user_id, fecha, tipo, punto_venta, numero, emisor_doc, emisor_nombre, importe) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                registros,
+            )
+
+    fechas = [r[1] for r in registros]
+    return {
+        "importados": leidas, "ignoradas": ignoradas,
+        "desde": min(fechas) if fechas else None, "hasta": max(fechas) if fechas else None,
+    }
+
+
+def info_recibidos(user_id):
+    init_db()
+    with _conn() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) cant, MIN(fecha) desde, MAX(fecha) hasta, "
+            "COUNT(DISTINCT emisor_doc) emisores FROM comprobantes_recibidos WHERE user_id=?",
+            (user_id,),
+        ).fetchone()
+        if not row["cant"]:
+            return None
+        return {"cant": row["cant"], "desde": row["desde"], "hasta": row["hasta"], "emisores": row["emisores"]}
+
+
+def resumen_recibidos(user_id, fecha_movil):
+    """Comprobantes recibidos agrupados por mes + acumulado móvil de 12 meses."""
+    init_db()
+    with _conn() as conn:
+        rows = conn.execute(
+            "SELECT fecha, tipo, punto_venta, numero, emisor_doc, emisor_nombre, importe "
+            "FROM comprobantes_recibidos WHERE user_id=? ORDER BY fecha DESC",
+            (user_id,),
+        ).fetchall()
+
+    meses = {}
+    for r in rows:
+        m = meses.setdefault(
+            r["fecha"][:6],
+            {"mes": r["fecha"][:6], "total": 0.0, "cantidad": 0, "comprobantes": []},
+        )
+        m["total"] += r["importe"]
+        m["cantidad"] += 1
+        m["comprobantes"].append({
+            "fecha": r["fecha"],
+            "tipo": CBTE_TIPO_NOMBRES.get(r["tipo"], f"Comprobante {r['tipo']}"),
+            "punto_venta": r["punto_venta"], "numero": r["numero"],
+            "emisor": r["emisor_nombre"] or r["emisor_doc"], "importe": r["importe"],
+        })
+
+    for m in meses.values():
+        m["comprobantes"].sort(key=lambda x: (x["fecha"], x["emisor"]))
+    meses_ordenados = [meses[k] for k in sorted(meses, reverse=True)]
+    movil = [r for r in rows if r["fecha"] >= fecha_movil]
+    return {
+        "meses": meses_ordenados,
+        "movil": {"total": sum(r["importe"] for r in movil), "cantidad": len(movil)},
     }
