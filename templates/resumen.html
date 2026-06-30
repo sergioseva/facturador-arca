@@ -69,6 +69,14 @@
       <noscript><button type="submit" class="btn-sm">Guardar</button></noscript>
     </form>
 
+    <p class="nota-cat" style="margin:.3rem 0 0">
+      Topes vigentes desde {{ vigente_desde }} (ARCA){% if topes_actualizado %} · actualizados el {{ topes_actualizado }}{% endif %}.
+      <form method="post" style="display:inline" id="form-topes">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" name="refrescar_topes" value="1" id="btn-topes" class="link-btn">↻ Actualizar desde ARCA</button>
+      </form>
+    </p>
+
     {% if msg %}<div class="feedback ok">{{ msg }}</div>{% endif %}
     {% if error %}<div class="feedback err">❌ {{ error }}</div>{% endif %}
     {% if info %}
@@ -92,14 +100,6 @@
     </div>
     {% endif %}
   </div>
-
-  <p class="nota-cat">
-    Topes vigentes desde {{ vigente_desde }} (ARCA){% if topes_actualizado %} · actualizados el {{ topes_actualizado }}{% endif %}.
-    <form method="post" style="display:inline" id="form-topes">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button type="submit" name="refrescar_topes" value="1" id="btn-topes" class="link-btn">↻ Actualizar desde ARCA</button>
-    </form>
-  </p>
 
   {% if meses %}
   <div class="leyenda">
