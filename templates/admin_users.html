@@ -22,6 +22,7 @@
   <div class="subnav">
     <a href="{{ url_for('admin_users') }}" class="active">Usuarios</a>
     <a href="{{ url_for('admin_guia') }}">Guía de alta</a>
+    <a href="{{ url_for('admin_imagenes') }}">Imágenes</a>
   </div>
   {% if esperando %}
   <div class="aviso-paso4">🔔 <b>{{ esperando }}</b> cliente{{ 's' if esperando != 1 }} marcó sus pasos en AFIP y espera que aceptes la delegación (tu <b>paso 4</b>). <a href="{{ url_for('admin_guia') }}">Ver guía →</a></div>

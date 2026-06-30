@@ -6,6 +6,7 @@ Factura C en nombre propio vía el computador fiscal de la plataforma (modelo de
 delegación): un solo certificado, y `Auth.Cuit` = CUIT del tenant.
 """
 
+import glob
 import os
 import secrets
 from datetime import datetime, timedelta
@@ -19,6 +20,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_file,
     session,
     url_for,
 )
@@ -55,18 +57,32 @@ PLATFORM_KEY = os.environ.get("PLATFORM_KEY_PATH") or os.environ.get("KEY_PATH",
 PLATFORM_CUIT = os.environ.get("PLATFORM_CUIT", "")      # para mostrar en onboarding
 PLATFORM_ALIAS = os.environ.get("PLATFORM_ALIAS", "")    # alias del computador fiscal
 
-# Capturas guía del onboarding (se muestran si el archivo existe en static/).
-_GUIA_IMGS = {
-    "arca": "onboarding/arca-organismo.png",
-    "representante": "onboarding/representante.png",
-}
+# Capturas guía del onboarding: se suben desde el panel y se guardan en el
+# volumen de datos (persisten entre deploys). Cada "slot" es una pantalla de AFIP.
+ONBOARDING_DIR = os.path.join(os.path.dirname(__file__), "data", "onboarding")
+os.makedirs(ONBOARDING_DIR, exist_ok=True)
+
+GUIA_SLOTS = [
+    {"key": "arca", "paso": 1, "titulo": "Paso 1 · Elegir ARCA",
+     "desc": "La lista de organismos, con ARCA seleccionado."},
+    {"key": "servicio", "paso": 1, "titulo": "Paso 1 · Elegir el servicio",
+     "desc": "La lista de servicios, con “Facturación Electrónica”."},
+    {"key": "representante", "paso": 1, "titulo": "Paso 1 · Representante",
+     "desc": "La pantalla donde se ingresa el CUIT de la plataforma como representante."},
+    {"key": "punto_venta", "paso": 2, "titulo": "Paso 2 · Punto de venta",
+     "desc": "El alta del punto de venta tipo “Factura Electrónica – Web Services”."},
+]
+_SLOT_KEYS = {s["key"] for s in GUIA_SLOTS}
+_IMG_EXTS = ("png", "jpg", "jpeg", "webp", "gif")
+
+
+def _slot_file(key):
+    matches = glob.glob(os.path.join(ONBOARDING_DIR, key + ".*"))
+    return matches[0] if matches else None
 
 
 def _guia_imgs():
-    return {
-        k: os.path.exists(os.path.join(app.static_folder, v))
-        for k, v in _GUIA_IMGS.items()
-    }
+    return {s["key"]: bool(_slot_file(s["key"])) for s in GUIA_SLOTS}
 
 
 @app.before_request
@@ -428,6 +444,48 @@ def admin_guia():
     return render_template(
         "admin_guia.html", platform_cuit=PLATFORM_CUIT, platform_alias=PLATFORM_ALIAS
     )
+
+
+@app.route("/guia-img/<slot>")
+@auth.login_required
+def guia_img(slot):
+    if slot not in _SLOT_KEYS:
+        abort(404)
+    path = _slot_file(slot)
+    if not path:
+        abort(404)
+    return send_file(path)
+
+
+@app.route("/admin/imagenes", methods=["GET", "POST"])
+@auth.admin_required
+def admin_imagenes():
+    msg = error = None
+    if request.method == "POST":
+        slot = request.form.get("slot", "")
+        if slot not in _SLOT_KEYS:
+            error = "Slot inválido."
+        elif request.form.get("accion") == "borrar":
+            f = _slot_file(slot)
+            if f:
+                os.remove(f)
+            msg = "Imagen eliminada."
+        else:
+            archivo = request.files.get("imagen")
+            if not archivo or not archivo.filename:
+                error = "Elegí una imagen."
+            else:
+                ext = archivo.filename.rsplit(".", 1)[-1].lower() if "." in archivo.filename else ""
+                if ext not in _IMG_EXTS:
+                    error = "Formato no soportado (png, jpg, webp, gif)."
+                else:
+                    prev = _slot_file(slot)
+                    if prev:
+                        os.remove(prev)
+                    archivo.save(os.path.join(ONBOARDING_DIR, slot + "." + ext))
+                    msg = "Imagen subida."
+    slots = [{**s, "tiene": bool(_slot_file(s["key"]))} for s in GUIA_SLOTS]
+    return render_template("admin_imagenes.html", slots=slots, msg=msg, error=error)
 
 
 @app.route("/admin/users", methods=["GET", "POST"])

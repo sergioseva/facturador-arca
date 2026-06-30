@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Admin · Imágenes guía — Factuya{% endblock %}
+{% block style %}
+  .subnav { display: flex; gap: .5rem; margin-bottom: 1.2rem; flex-wrap: wrap; }
+  .subnav a { font-size: .9rem; padding: .4rem .8rem; border-radius: 8px; text-decoration: none; color: var(--muted); border: 1px solid var(--border); }
+  .subnav a.active { background: var(--primary-soft); color: var(--primary); border-color: transparent; font-weight: 600; }
+  .slot { display: flex; gap: 1.2rem; align-items: flex-start; padding: 1.1rem 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .slot .thumb { width: 170px; flex-shrink: 0; }
+  .slot .thumb img { width: 100%; border: 1px solid var(--border); border-radius: 8px; display: block; }
+  .slot .thumb .none { width: 100%; aspect-ratio: 3/2; border: 1px dashed var(--border-strong); border-radius: 8px; display: grid; place-items: center; color: var(--muted); font-size: .8rem; }
+  .slot .info { flex: 1; min-width: 240px; }
+  .slot .info b { font-size: 1rem; }
+  .up { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; margin-top: .7rem; }
+  .up input[type=file] { width: auto; }
+  .del { background: none; border: none; color: var(--err-fg); cursor: pointer; text-decoration: underline; font-size: .85rem; }
+{% endblock %}
+{% block content %}
+  <h1>🖼️ Imágenes de la guía</h1>
+  <div class="subnav">
+    <a href="{{ url_for('admin_users') }}">Usuarios</a>
+    <a href="{{ url_for('admin_guia') }}">Guía de alta</a>
+    <a href="{{ url_for('admin_imagenes') }}" class="active">Imágenes</a>
+  </div>
+  {% if msg %}<div class="ok" style="margin:1rem 0">{{ msg }}</div>{% endif %}
+  {% if error %}<div class="error" style="margin:1rem 0">❌ {{ error }}</div>{% endif %}
+
+  <p class="muted">Subí capturas de las pantallas de AFIP para guiar al cliente. Aparecen en el paso correspondiente del onboarding (PNG, JPG, WEBP o GIF).</p>
+
+  {% for s in slots %}
+  <div class="slot">
+    <div class="thumb">
+      {% if s.tiene %}
+      <a href="{{ url_for('guia_img', slot=s.key) }}" target="_blank"><img src="{{ url_for('guia_img', slot=s.key) }}?v={{ range(999999)|random }}" alt="{{ s.titulo }}"></a>
+      {% else %}<div class="none">sin imagen</div>{% endif %}
+    </div>
+    <div class="info">
+      <b>{{ s.titulo }}</b>
+      <div class="muted">{{ s.desc }}</div>
+      <div class="up">
+        <form method="post" enctype="multipart/form-data" class="up" style="margin:0">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="slot" value="{{ s.key }}">
+          <input type="file" name="imagen" accept="image/*" required>
+          <button type="submit" class="btn-sm">{{ 'Reemplazar' if s.tiene else 'Subir' }}</button>
+        </form>
+        {% if s.tiene %}
+        <form method="post" style="margin:0" onsubmit="return confirm('¿Borrar esta imagen de la guía?');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="slot" value="{{ s.key }}">
+          <input type="hidden" name="accion" value="borrar">
+          <button type="submit" class="del">borrar</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+{% endblock %}

@@ -31,21 +31,19 @@
     </li>
     <li>Confirmá. Esto es lo que nos habilita a emitir tus comprobantes.</li>
   </ol>
-  {% if imgs.arca or imgs.representante %}
+  {% if imgs.arca or imgs.servicio or imgs.representante %}
   <div class="capturas">
     {% if imgs.arca %}
-    <figure>
-      <a href="{{ url_for('static', filename='onboarding/arca-organismo.png') }}" target="_blank">
-        <img src="{{ url_for('static', filename='onboarding/arca-organismo.png') }}" alt="Elegir ARCA en la lista de organismos"></a>
-      <figcaption>Al buscar el servicio, elegí <b>ARCA</b> en la lista de organismos.</figcaption>
-    </figure>
+    <figure><a href="{{ url_for('guia_img', slot='arca') }}" target="_blank"><img src="{{ url_for('guia_img', slot='arca') }}" alt="Elegir ARCA"></a>
+      <figcaption>Al buscar el servicio, elegí <b>ARCA</b> en la lista de organismos.</figcaption></figure>
+    {% endif %}
+    {% if imgs.servicio %}
+    <figure><a href="{{ url_for('guia_img', slot='servicio') }}" target="_blank"><img src="{{ url_for('guia_img', slot='servicio') }}" alt="Elegir el servicio"></a>
+      <figcaption>Elegí <b>Facturación Electrónica</b> en la lista de servicios.</figcaption></figure>
     {% endif %}
     {% if imgs.representante %}
-    <figure>
-      <a href="{{ url_for('static', filename='onboarding/representante.png') }}" target="_blank">
-        <img src="{{ url_for('static', filename='onboarding/representante.png') }}" alt="Pantalla del representante"></a>
-      <figcaption>En <b>Representante</b>, ingresá el CUIT de la plataforma (<b>{{ platform_cuit or '20242454600' }}</b>) en “CUIT/CUIL/CDI Usuario” y tocá <b>Buscar</b>.</figcaption>
-    </figure>
+    <figure><a href="{{ url_for('guia_img', slot='representante') }}" target="_blank"><img src="{{ url_for('guia_img', slot='representante') }}" alt="Pantalla del representante"></a>
+      <figcaption>En <b>Representante</b>, ingresá el CUIT de la plataforma (<b>{{ platform_cuit or '20242454600' }}</b>) y tocá <b>Buscar</b>.</figcaption></figure>
     {% endif %}
   </div>
   {% endif %}
@@ -56,6 +54,12 @@
     <li>Sistema: <b>Factura Electrónica – Web Services</b> (¡no "Comprobantes en línea"!).</li>
     <li>Anotá el número que te asigna.</li>
   </ol>
+  {% if imgs.punto_venta %}
+  <div class="capturas">
+    <figure><a href="{{ url_for('guia_img', slot='punto_venta') }}" target="_blank"><img src="{{ url_for('guia_img', slot='punto_venta') }}" alt="Alta del punto de venta"></a>
+      <figcaption>Dá de alta el punto de venta con sistema <b>Factura Electrónica – Web Services</b>.</figcaption></figure>
+  </div>
+  {% endif %}
 
   <h3>3. Avisanos que terminaste en AFIP</h3>
   {% if cfg.cliente_marco_arca %}

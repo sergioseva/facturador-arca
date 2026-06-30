@@ -20,3 +20,6 @@ __pycache__/
 .venv/
 venv/
 !.gitkeep
+
+# imágenes guía subidas desde el panel
+data/onboarding/
