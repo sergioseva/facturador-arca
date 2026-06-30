@@ -15,7 +15,9 @@
   .hero { background: linear-gradient(135deg, #15803d, #0d3a23); color: #fff;
     padding: 1.4rem 1.5rem; border-radius: var(--radius); margin: .4rem 0 1.4rem;
     box-shadow: 0 12px 30px -16px rgba(21,128,61,.55); border: 1px solid rgba(255,255,255,.08); }
-  .hero.warn { background: linear-gradient(135deg, #9a3412, #4a1d0a); box-shadow: 0 12px 30px -16px rgba(154,52,18,.55); }
+  .hero.verde { background: linear-gradient(135deg, #15803d, #0d3a23); box-shadow: 0 12px 30px -16px rgba(21,128,61,.55); }
+  .hero.amarillo { background: linear-gradient(135deg, #a16207, #4a3a0a); box-shadow: 0 12px 30px -16px rgba(161,98,7,.55); }
+  .hero.rojo { background: linear-gradient(135deg, #9a3412, #4a1d0a); box-shadow: 0 12px 30px -16px rgba(154,52,18,.55); }
   .hero small { color: rgba(255,255,255,.85); font-size: .82rem; }
   .hero .total { font-size: 2.3rem; font-weight: 800; letter-spacing: -.02em; margin-top: .15rem; font-variant-numeric: tabular-nums; }
   .cat-msg { margin-top: .7rem; font-size: .92rem; line-height: 1.45; }
@@ -68,25 +70,22 @@
     <div class="card"><div class="lbl">Recibido (compras) · últ. 12 meses</div><div class="val">$ {{ recib12|ars }}</div></div>
   </div>
 
-  {% if emit12 > 0 %}
-    {% set dif12 = (recib12 - emit12) / emit12 * 100 %}
-    <div class="hero {{ 'warn' if dif12 > 0 }}">
-      <small>Recibido vs. facturado (últimos 12 meses)</small>
-      <div class="total">{% if dif12 > 0 %}+{{ dif12|round|int }}%{% else %}en regla{% endif %}</div>
+  {% if emit12 > 0 or recib12 > 0 %}
+    {% set margen = ((emit12 - recib12) / recib12 * 100) if recib12 > 0 else 100 %}
+    {% set banda = 'verde' if margen > 10 else ('rojo' if margen < -10 else 'amarillo') %}
+    <div class="hero {{ banda }}">
+      <small>Facturado vs. recibido (últimos 12 meses)</small>
+      <div class="total">{{ '+' if margen >= 0 }}{{ margen|round|int }}%</div>
       <div class="cat-msg">
-        {% if dif12 > 0 %}
-          ⚠️ Recibiste <b>$ {{ (recib12 - emit12)|ars }}</b> más de lo que facturaste — un <b>{{ dif12|round|int }}%</b> por encima de tus ventas. Recibir mucho más de lo que facturás puede hacer sospechar <b>ventas sin declarar</b>.
+        {% if banda == 'rojo' %}
+          ⚠️ Recibís más de lo que facturás — puede hacer sospechar <b>ventas sin declarar</b>.
+        {% elif banda == 'amarillo' %}
+          Facturado y recibido están parejos. Atención si lo recibido empieza a superar lo facturado.
         {% else %}
-          ✓ Facturás tanto o más de lo que recibís ($ {{ emit12|ars }} facturado vs. $ {{ recib12|ars }} recibido).
+          ✓ Facturás un <b>{{ margen|round|int }}%</b> por encima de lo que recibís.
         {% endif %}
-        <br><small style="color:rgba(255,255,255,.7)">No hay un porcentaje oficial; es una referencia para tu control.</small>
+        <br><small style="color:rgba(255,255,255,.7)">% de lo facturado por encima de lo recibido. Verde &gt; +10%, amarillo entre ±10%, rojo &lt; -10%. No hay un umbral oficial.</small>
       </div>
-    </div>
-  {% elif recib12 > 0 %}
-    <div class="hero warn">
-      <small>Recibido vs. facturado (últimos 12 meses)</small>
-      <div class="total">sin facturar</div>
-      <div class="cat-msg">Recibiste <b>$ {{ recib12|ars }}</b> pero no hay ventas facturadas registradas en el período.</div>
     </div>
   {% endif %}
 
