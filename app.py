@@ -153,6 +153,73 @@ def _num(raw):
         return 0.0
 
 
+def _num_cell(v):
+    """Número desde una celda de Excel/CSV (puede venir como número o texto AR)."""
+    if v is None:
+        return 0.0
+    if isinstance(v, (int, float)):
+        return float(v)
+    return _num(str(v))
+
+
+def _parse_items_excel(fs):
+    """Lee ítems de un .xlsx o .csv. Columnas: descripción, cantidad, precio unit.
+    Detecta encabezado por nombre; si no hay, asume ese orden. Devuelve lista de
+    {desc, cant, precio}."""
+    nombre = (fs.filename or "").lower()
+    if nombre.endswith(".csv"):
+        import csv
+        import io as _io
+        raw = fs.read().decode("utf-8-sig", errors="replace")
+        delim = ";" if raw.count(";") > raw.count(",") else ","
+        rows = [list(r) for r in csv.reader(_io.StringIO(raw), delimiter=delim)]
+    elif nombre.endswith(".xlsx"):
+        from openpyxl import load_workbook
+        wb = load_workbook(fs, read_only=True, data_only=True)
+        rows = [list(r) for r in wb.active.iter_rows(values_only=True)]
+    else:
+        raise ValueError("Formato no soportado. Subí un archivo .xlsx o .csv.")
+
+    rows = [r for r in rows if r and any(c not in (None, "") for c in r)]
+    if not rows:
+        raise ValueError("El archivo está vacío.")
+
+    header = [str(c or "").strip().lower() for c in rows[0]]
+
+    def find(*keys):
+        for i, h in enumerate(header):
+            if any(k in h for k in keys):
+                return i
+        return None
+
+    di = find("desc", "detalle", "producto", "concepto", "articul", "item", "ítem")
+    ci = find("cant")
+    pi = find("precio", "import", "valor", "monto", "unit")
+    if di is None and ci is None and pi is None:
+        di, ci, pi, start = 0, 1, 2, 0       # sin encabezado: asumir el orden
+    else:
+        di = 0 if di is None else di
+        ci = 1 if ci is None else ci
+        pi = 2 if pi is None else pi
+        start = 1
+
+    items = []
+    for r in rows[start:]:
+        def cell(i):
+            return r[i] if (i is not None and i < len(r)) else None
+        desc = str(cell(di) or "").strip()
+        cant = _num_cell(cell(ci))
+        precio = _num_cell(cell(pi))
+        if not desc and cant == 0 and precio == 0:
+            continue
+        items.append({"desc": desc or "Ítem", "cant": cant or 1, "precio": precio})
+        if len(items) >= 200:
+            break
+    if not items:
+        raise ValueError("No se encontraron ítems. Esperado: descripción, cantidad, precio.")
+    return items
+
+
 # --- auth -------------------------------------------------------------------
 
 
@@ -285,6 +352,21 @@ def facturar():
         items=db.listar_items(g.user["id"]),
         item_default=cfg.get("item_descripcion") or "",
     )
+
+
+@app.route("/api/items-excel", methods=["POST"])
+@auth.login_required
+def api_items_excel():
+    """Parsea un Excel/CSV de ítems y devuelve la lista para precargar el facturador."""
+    fs = request.files.get("archivo")
+    if not fs or not fs.filename:
+        return {"error": "Elegí un archivo .xlsx o .csv."}
+    try:
+        return {"items": _parse_items_excel(fs)}
+    except ValueError as e:
+        return {"error": str(e)}
+    except Exception as e:  # noqa: BLE001
+        return {"error": f"No se pudo leer el archivo: {e}"}
 
 
 @app.route("/api/padron")
