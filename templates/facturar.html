@@ -131,6 +131,7 @@
       <dt>Vto. CAE</dt><dd>{{ resultado.cae_vto }}</dd>
     </dl>
     {% if resultado.observaciones %}<p>{{ resultado.observaciones }}</p>{% endif %}
+    {% if resultado.id %}<a class="btn btn-ghost btn-sm" href="{{ url_for('factura_pdf_route', fid=resultado.id) }}" target="_blank" style="margin-top:.8rem">⬇️ Descargar PDF</a>{% endif %}
   </div>
   {% endif %}
   {% if error %}<div class="error">❌ {{ error }}</div>{% endif %}

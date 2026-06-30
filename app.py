@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from flask import (
     Flask,
+    Response,
     abort,
     flash,
     g,
@@ -33,6 +34,7 @@ import afip
 import auth
 import categorias
 import db
+import pdf
 import json
 
 load_dotenv()
@@ -194,7 +196,7 @@ def facturar():
                 doc_nro=doc_nro,
                 cond_iva_receptor=cond_iva,
             )
-            db.guardar(g.user["id"], resultado)
+            resultado["id"] = db.guardar(g.user["id"], resultado)
             # recordar el receptor si quedó identificado (no Consumidor Final)
             if resultado.get("doc_tipo") and int(resultado["doc_tipo"]) != 99:
                 db.guardar_receptor(
@@ -259,6 +261,27 @@ def historial():
         "historial.html",
         facturas=db.listar(g.user["id"]),
         totales=db.totales(g.user["id"]),
+    )
+
+
+@app.route("/factura/<int:fid>.pdf")
+@auth.login_required
+def factura_pdf_route(fid):
+    f = db.get_factura(g.user["id"], fid)
+    if not f:
+        abort(404)
+    cfg = db.get_tenant_config(g.user["id"]) or {}
+    f["concepto"] = cfg.get("concepto")
+    emisor = {
+        "cuit": cfg.get("cuit") or "",
+        "razon_social": cfg.get("razon_social") or "",
+        "condicion": "Responsable Monotributo",
+    }
+    data = pdf.factura_pdf(f, emisor)
+    nombre = f"factura-C-{int(f['punto_venta']):04d}-{int(f['numero']):08d}.pdf"
+    return Response(
+        data, mimetype="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{nombre}"'},
     )
 
 

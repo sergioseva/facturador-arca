@@ -42,6 +42,7 @@
         <td>
           {% if f.estado == 'emitida' %}
             <span class="cae">{{ f.cae }}</span><br><small class="muted">vto {{ f.cae_vto[6:8] }}/{{ f.cae_vto[4:6] }}/{{ f.cae_vto[0:4] }}</small>
+            <br><a href="{{ url_for('factura_pdf_route', fid=f.id) }}" target="_blank" style="font-size:.8rem">⬇️ PDF</a>
           {% else %}<span class="msg-error">{{ f.error }}</span>{% endif %}
         </td>
         <td><span class="badge {{ 'prod' if f.entorno == 'produccion' else 'homo' }}">{{ f.entorno }}</span></td>

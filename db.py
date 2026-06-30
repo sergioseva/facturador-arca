@@ -35,7 +35,9 @@ CREATE TABLE IF NOT EXISTS facturas (
     cae_vto       TEXT,
     observaciones TEXT,
     error         TEXT,
-    receptor      TEXT
+    receptor      TEXT,
+    doc_tipo      INTEGER,
+    doc_nro       TEXT
 )
 """
 
@@ -196,6 +198,10 @@ def init_db():
             conn.execute("UPDATE facturas SET user_id=1 WHERE user_id IS NULL")
         if "receptor" not in cols_f:
             conn.execute("ALTER TABLE facturas ADD COLUMN receptor TEXT")
+        if "doc_tipo" not in cols_f:
+            conn.execute("ALTER TABLE facturas ADD COLUMN doc_tipo INTEGER")
+        if "doc_nro" not in cols_f:
+            conn.execute("ALTER TABLE facturas ADD COLUMN doc_nro TEXT")
 
         # --- tablas con user_id en el PK ---
         _migrar_user_id_pk(
@@ -406,8 +412,9 @@ def guardar(user_id, resultado: dict) -> int:
             """
             INSERT INTO facturas
                 (user_id, emitido_en, entorno, estado, tipo, punto_venta, numero,
-                 fecha, importe, cae, cae_vto, observaciones, error, receptor)
-            VALUES (?, ?, ?, 'emitida', ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+                 fecha, importe, cae, cae_vto, observaciones, error, receptor,
+                 doc_tipo, doc_nro)
+            VALUES (?, ?, ?, 'emitida', ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
             """,
             (
                 user_id,
@@ -422,6 +429,8 @@ def guardar(user_id, resultado: dict) -> int:
                 resultado["cae_vto"],
                 resultado.get("observaciones", ""),
                 resultado.get("receptor"),
+                resultado.get("doc_tipo"),
+                str(resultado.get("doc_nro")) if resultado.get("doc_nro") is not None else None,
             ),
         )
         return cur.lastrowid
@@ -470,6 +479,17 @@ def registrar_error(user_id, emitido_en, entorno, importe, error) -> int:
             (user_id, emitido_en, entorno, importe, error),
         )
         return cur.lastrowid
+
+
+def get_factura(user_id, factura_id):
+    """Una factura emitida del usuario (o None)."""
+    init_db()
+    with _conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM facturas WHERE id=? AND user_id=? AND estado='emitida'",
+            (factura_id, user_id),
+        ).fetchone()
+        return dict(row) if row else None
 
 
 def listar(user_id, limite: int = 200):

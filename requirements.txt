@@ -5,3 +5,5 @@ email-validator==2.2.0
 zeep>=4.3.3
 cryptography==42.0.8
 python-dotenv==1.0.1
+fpdf2==2.8.1
+qrcode[pil]==7.4.2
