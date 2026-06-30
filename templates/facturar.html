@@ -48,6 +48,13 @@
     <input type="date" id="fecha" name="fecha" value="{{ hoy }}" max="{{ hoy }}">
     <small class="muted" style="display:block;margin-top:.4rem">Dejala en hoy, o elegí un día atrasado (hasta 10 días).</small>
 
+    <label for="condicion_venta" style="margin-top:1.1rem">Condición de venta</label>
+    <select id="condicion_venta" name="condicion_venta">
+      {% for cv in condiciones %}
+      <option value="{{ cv }}" {{ 'selected' if cv == cond_venta_default }}>{{ cv }}</option>
+      {% endfor %}
+    </select>
+
     <details class="receptor">
       <summary>Receptor <span class="muted">· opcional (por defecto Consumidor Final)</span></summary>
       {% if receptores %}
@@ -109,6 +116,7 @@
         <dt>Importe</dt><dd id="cf-importe"></dd>
         <dt>Fecha</dt><dd id="cf-fecha"></dd>
         <dt>Receptor</dt><dd id="cf-receptor"></dd>
+        <dt>Cond. de venta</dt><dd id="cf-cv"></dd>
         <dt>Entorno</dt><dd id="cf-entorno"></dd>
       </dl>
       <p id="cf-warn" class="cf-warn">⚠️ Esta factura es <b>real</b> y válida fiscalmente.</p>
@@ -164,6 +172,7 @@
         rec = t + ' ' + nro + (nom ? ' · ' + nom : '');
       }
       document.getElementById('cf-receptor').textContent = rec;
+      document.getElementById('cf-cv').textContent = document.getElementById('condicion_venta').value;
       const prod = form.dataset.entorno === 'produccion';
       document.getElementById('cf-entorno').textContent = prod ? 'Producción (real)' : 'Homologación (pruebas)';
       document.getElementById('cf-warn').style.display = prod ? 'block' : 'none';

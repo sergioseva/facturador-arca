@@ -38,7 +38,8 @@ CREATE TABLE IF NOT EXISTS facturas (
     receptor      TEXT,
     doc_tipo      INTEGER,
     doc_nro       TEXT,
-    cond_iva      INTEGER
+    cond_iva      INTEGER,
+    condicion_venta TEXT
 )
 """
 
@@ -213,6 +214,8 @@ def init_db():
             conn.execute("ALTER TABLE facturas ADD COLUMN doc_nro TEXT")
         if "cond_iva" not in cols_f:
             conn.execute("ALTER TABLE facturas ADD COLUMN cond_iva INTEGER")
+        if "condicion_venta" not in cols_f:
+            conn.execute("ALTER TABLE facturas ADD COLUMN condicion_venta TEXT")
 
         # --- tablas con user_id en el PK ---
         _migrar_user_id_pk(
@@ -430,8 +433,8 @@ def guardar(user_id, resultado: dict) -> int:
             INSERT INTO facturas
                 (user_id, emitido_en, entorno, estado, tipo, punto_venta, numero,
                  fecha, importe, cae, cae_vto, observaciones, error, receptor,
-                 doc_tipo, doc_nro, cond_iva)
-            VALUES (?, ?, ?, 'emitida', ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)
+                 doc_tipo, doc_nro, cond_iva, condicion_venta)
+            VALUES (?, ?, ?, 'emitida', ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
@@ -449,6 +452,7 @@ def guardar(user_id, resultado: dict) -> int:
                 resultado.get("doc_tipo"),
                 str(resultado.get("doc_nro")) if resultado.get("doc_nro") is not None else None,
                 resultado.get("cond_iva"),
+                resultado.get("condicion_venta"),
             ),
         )
         return cur.lastrowid

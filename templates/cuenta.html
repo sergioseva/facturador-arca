@@ -30,8 +30,12 @@
     <input type="text" id="ingresos_brutos" name="ingresos_brutos" value="{{ cfg.ingresos_brutos or '' }}" placeholder="Ej: EXENTO, o el número">
     <label for="inicio_actividades">Fecha de inicio de actividades</label>
     <input type="text" id="inicio_actividades" name="inicio_actividades" value="{{ cfg.inicio_actividades or '' }}" placeholder="dd/mm/aaaa">
-    <label for="condicion_venta">Condición de venta</label>
-    <input type="text" id="condicion_venta" name="condicion_venta" value="{{ cfg.condicion_venta or '' }}" placeholder="Ej: Contado, Transferencia Bancaria">
+    <label for="condicion_venta">Condición de venta (por defecto)</label>
+    <select id="condicion_venta" name="condicion_venta">
+      {% for cv in condiciones %}
+      <option value="{{ cv }}" {{ 'selected' if cfg.condicion_venta == cv }}>{{ cv }}</option>
+      {% endfor %}
+    </select>
     <label for="item_descripcion">Descripción del ítem (producto/servicio)</label>
     <input type="text" id="item_descripcion" name="item_descripcion" value="{{ cfg.item_descripcion or '' }}" placeholder="Ej: Libros, Servicios profesionales">
     <label for="leyenda">Leyenda (pie de la factura, opcional)</label>

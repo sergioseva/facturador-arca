@@ -77,6 +77,11 @@ GUIA_SLOTS = [
 _SLOT_KEYS = {s["key"] for s in GUIA_SLOTS}
 _IMG_EXTS = ("png", "jpg", "jpeg", "webp", "gif")
 
+CONDICIONES_VENTA = [
+    "Contado", "Tarjeta de Débito", "Tarjeta de Crédito", "Cuenta Corriente",
+    "Cheque", "Transferencia Bancaria", "Otra", "Otros medios de pago electrónico",
+]
+
 
 def _slot_file(key):
     matches = glob.glob(os.path.join(ONBOARDING_DIR, key + ".*"))
@@ -182,6 +187,7 @@ def facturar():
             doc_nro = request.form.get("doc_nro", "").strip()
             cond_iva = request.form.get("cond_iva", "").strip() or None
             nombre = request.form.get("receptor_nombre", "").strip()
+            cond_venta = request.form.get("condicion_venta", "").strip() or cfg.get("condicion_venta") or "Contado"
             resultado = afip.emitir_factura_c(
                 cuit=cfg["cuit"],
                 entorno=cfg["entorno"],
@@ -196,6 +202,7 @@ def facturar():
                 doc_nro=doc_nro,
                 cond_iva_receptor=cond_iva,
             )
+            resultado["condicion_venta"] = cond_venta
             resultado["id"] = db.guardar(g.user["id"], resultado)
             # recordar el receptor si quedó identificado (no Consumidor Final)
             if resultado.get("doc_tipo") and int(resultado["doc_tipo"]) != 99:
@@ -228,6 +235,8 @@ def facturar():
         entorno=cfg["entorno"], punto_venta=cfg["punto_venta"], cuit=cfg["cuit"],
         hoy=hoy, receptores=db.listar_receptores(g.user["id"]),
         doc_nombres=afip.DOC_TIPO_NOMBRES,
+        condiciones=CONDICIONES_VENTA,
+        cond_venta_default=cfg.get("condicion_venta") or "Contado",
     )
 
 
@@ -282,7 +291,7 @@ def factura_pdf_route(fid):
         "domicilio": cfg.get("domicilio_comercial") or "",
         "ingresos_brutos": cfg.get("ingresos_brutos") or "",
         "inicio_actividades": cfg.get("inicio_actividades") or "",
-        "condicion_venta": cfg.get("condicion_venta") or "",
+        "condicion_venta": f.get("condicion_venta") or cfg.get("condicion_venta") or "",
         "item_descripcion": cfg.get("item_descripcion") or "",
         "leyenda": cfg.get("leyenda") or "",
     }
@@ -477,6 +486,7 @@ def cuenta():
                 msg = "Clave actualizada."
     return render_template(
         "cuenta.html", cfg=db.get_tenant_config(uid) or {}, msg=msg, error=error,
+        condiciones=CONDICIONES_VENTA,
     )
 
 
