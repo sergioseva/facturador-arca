@@ -6,6 +6,8 @@
   .controls .lbl { font-weight: 600; font-size: .9rem; }
   .controls input[type=file] { flex: 1; min-width: 180px; }
   .feedback.ok, .feedback.err { margin-top: .2rem; }
+  .link-btn { background: none; border: none; cursor: pointer; font-size: .8rem; padding: 0 .2rem; text-decoration: underline; font-weight: 500; }
+  .link-btn.danger { color: #f87171; }
 
   .cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.2rem 0 .8rem; }
   .cmp .card { padding: 1.1rem 1.3rem; }
@@ -61,7 +63,13 @@
     {% if error %}<div class="feedback err">❌ {{ error }}</div>{% endif %}
     {% if info %}
     <p class="muted" style="margin:0">Datos cargados: {{ info.cant }} comprobantes de {{ info.emisores }} emisor(es),
-      del {{ info.desde[6:8] }}/{{ info.desde[4:6] }}/{{ info.desde[0:4] }} al {{ info.hasta[6:8] }}/{{ info.hasta[4:6] }}/{{ info.hasta[0:4] }}.</p>
+      del {{ info.desde[6:8] }}/{{ info.desde[4:6] }}/{{ info.desde[0:4] }} al {{ info.hasta[6:8] }}/{{ info.hasta[4:6] }}/{{ info.hasta[0:4] }}.
+      <form method="post" style="display:inline"
+            onsubmit="return confirm('¿Borrar los {{ info.cant }} comprobantes recibidos importados?')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" name="borrar_recibidos" value="1" class="link-btn danger">🗑 Borrar recibidos</button>
+      </form>
+    </p>
     {% endif %}
   </div>
 

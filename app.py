@@ -460,6 +460,14 @@ def resumen():
                 msg = f"Topes actualizados desde ARCA (vigentes desde {vigente})."
             except Exception as e:  # noqa: BLE001
                 error = f"No pude actualizar los topes desde ARCA: {e}"
+        elif "borrar_importados" in request.form:
+            n = db.borrar_mis_comprobantes(uid, entorno)
+            msg = (
+                f"Borré {n} comprobante(s) importado(s). Las facturas emitidas por el "
+                "facturador quedaron intactas."
+                if n
+                else "No había comprobantes importados para borrar."
+            )
         elif "categoria" in request.form:
             cat = request.form["categoria"].strip().upper()
             if cat in categorias.TOPES or cat == "":
@@ -519,7 +527,10 @@ def recibidos():
 
     if request.method == "POST":
         archivo = request.files.get("csv")
-        if not archivo or not archivo.filename:
+        if "borrar_recibidos" in request.form:
+            n = db.borrar_recibidos(uid)
+            msg = f"Borré {n} comprobante(s) recibido(s)." if n else "No había comprobantes recibidos para borrar."
+        elif not archivo or not archivo.filename:
             error = "Elegí el archivo CSV/ZIP de Comprobantes Recibidos."
         else:
             try:

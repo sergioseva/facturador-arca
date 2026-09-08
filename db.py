@@ -695,6 +695,31 @@ def acumulado_desde(user_id, entorno, fecha_desde):
 # --- Import del CSV de Mis Comprobantes -------------------------------------
 
 
+def _tipo_export(cab):
+    """
+    Distingue los dos CSV de "Mis Comprobantes" por sus columnas de contraparte:
+    el de Emitidos trae Receptor (a quién le facturé) y el de Recibidos trae
+    Emisor (quién me facturó). Devuelve 'emitidos' | 'recibidos' | None.
+    """
+
+    def tiene(*nombres):
+        return any(_norm(n) in cab for n in nombres)
+
+    receptor = tiene(
+        "Nro. Doc. Receptor", "Nro Doc Receptor", "Tipo Doc. Receptor",
+        "Denominación Receptor", "Denominacion Receptor",
+    )
+    emisor = tiene(
+        "Nro. Doc. Emisor", "Nro Doc Emisor", "Tipo Doc. Emisor",
+        "Denominación Emisor", "Denominacion Emisor",
+    )
+    if receptor and not emisor:
+        return "emitidos"
+    if emisor and not receptor:
+        return "recibidos"
+    return None
+
+
 def importar_mis_comprobantes(user_id, contenido: bytes, entorno: str):
     """
     Parsea el ZIP/CSV de 'Mis Comprobantes' (emitidos) del usuario y lo guarda.
@@ -734,6 +759,13 @@ def importar_mis_comprobantes(user_id, contenido: bytes, entorno: str):
             if _norm(n) in cab:
                 return cab[_norm(n)]
         return None
+
+    if _tipo_export(cab) == "recibidos":
+        return {
+            "error": "Ese archivo es el de Comprobantes RECIBIDOS (los que te emitieron "
+            "a vos): trae columnas de Emisor. Importalo en la solapa Recibidos — acá van "
+            "solo los Emitidos, si no te contaría compras como facturación propia."
+        }
 
     i_fecha = col("Fecha de Emisión", "Fecha", "Fecha Emision")
     i_tipo = col("Tipo de Comprobante", "Tipo")
@@ -794,6 +826,20 @@ def info_mis(user_id, entorno):
         if not row["cant"]:
             return None
         return {"cant": row["cant"], "desde": row["desde"], "hasta": row["hasta"], "pvs": row["pvs"]}
+
+
+def borrar_mis_comprobantes(user_id, entorno):
+    """
+    Borra TODOS los comprobantes importados del CSV de Emitidos del tenant.
+    No toca las facturas que emitió la app (tabla `facturas`): sirve para
+    deshacer una importación equivocada y volver a subir el archivo correcto.
+    """
+    init_db()
+    with _conn() as conn:
+        cur = conn.execute(
+            "DELETE FROM mis_comprobantes WHERE user_id=? AND entorno=?", (user_id, entorno)
+        )
+        return cur.rowcount
 
 
 def resumen_detallado(user_id, entorno, fecha_movil):
@@ -894,6 +940,13 @@ def importar_recibidos(user_id, contenido: bytes):
                 return cab[_norm(n)]
         return None
 
+    if _tipo_export(cab) == "emitidos":
+        return {
+            "error": "Ese archivo es el de Comprobantes EMITIDOS (los que emitiste vos): "
+            "trae columnas de Receptor. Importalo en Control monotributo — acá van solo "
+            "los Recibidos."
+        }
+
     i_fecha = col("Fecha de Emisión", "Fecha", "Fecha Emision")
     i_tipo = col("Tipo de Comprobante", "Tipo")
     i_pv = col("Punto de Venta", "Punto Venta")
@@ -957,6 +1010,14 @@ def info_recibidos(user_id):
         if not row["cant"]:
             return None
         return {"cant": row["cant"], "desde": row["desde"], "hasta": row["hasta"], "emisores": row["emisores"]}
+
+
+def borrar_recibidos(user_id):
+    """Borra TODOS los comprobantes recibidos importados del tenant."""
+    init_db()
+    with _conn() as conn:
+        cur = conn.execute("DELETE FROM comprobantes_recibidos WHERE user_id=?", (user_id,))
+        return cur.rowcount
 
 
 def resumen_recibidos(user_id, fecha_movil):
