@@ -505,6 +505,17 @@ def _tipo_nombre(raw):
     return (raw or "").strip() or "Comprobante"
 
 
+def _con_signo(tipo, importe):
+    """
+    Importe con el signo fiscal del comprobante: las notas de crédito restan.
+    En la base el importe se guarda como lo autorizó ARCA (en positivo, que es
+    lo que va impreso); el signo se aplica acá, donde se suma.
+    """
+    if _tipo_codigo(tipo) in CBTE_NC or "credito" in _norm(tipo or ""):
+        return -abs(importe)
+    return importe
+
+
 def _parse_fecha(s):
     """Devuelve yyyymmdd o None."""
     s = (s or "").strip()
@@ -676,7 +687,10 @@ def totales(user_id):
             """
             SELECT entorno,
                    SUM(estado = 'emitida') AS emitidas,
-                   COALESCE(SUM(CASE WHEN estado='emitida' THEN importe END), 0) AS total,
+                   COALESCE(SUM(CASE WHEN estado='emitida' THEN
+                       CASE WHEN tipo LIKE 'Nota de Cr%' THEN -ABS(importe)
+                            ELSE importe END
+                   END), 0) AS total,
                    SUM(estado = 'error') AS errores
             FROM facturas WHERE user_id=? GROUP BY entorno
             """,
@@ -839,13 +853,10 @@ def importar_mis_comprobantes(user_id, contenido: bytes, entorno: str):
             ignoradas += 1
             continue
         raw_tipo = fila[i_tipo] if i_tipo is not None else ""
-        codigo = _tipo_codigo(raw_tipo)
         tipo = _tipo_nombre(raw_tipo)
         pv = int(_parse_num(fila[i_pv])) if i_pv is not None else 0
         numero = int(_parse_num(fila[i_num])) if i_num is not None else leidas + 1
-        importe = _parse_num(fila[i_imp])
-        if codigo in CBTE_NC or "credito" in _norm(tipo):
-            importe = -abs(importe)
+        importe = _con_signo(raw_tipo, _parse_num(fila[i_imp]))
         registros.append((user_id, entorno, pv, tipo, numero, fecha, importe))
         leidas += 1
 
@@ -925,7 +936,8 @@ def resumen_detallado(user_id, entorno, fecha_movil):
     comprobantes = [
         {
             "fecha": r["fecha"], "tipo": r["tipo"] or "Factura C", "punto_venta": r["punto_venta"],
-            "numero": r["numero"], "importe": r["importe"], "origen": "facturador",
+            "numero": r["numero"], "importe": _con_signo(r["tipo"], r["importe"]),
+            "origen": "facturador",
         }
         for r in app_rows
     ]

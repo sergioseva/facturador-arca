@@ -83,6 +83,7 @@ DATA_DIR.mkdir(exist_ok=True)
 
 # Factura C (Monotributo). Consumidor Final = tipo doc 99, número 0.
 CBTE_TIPO_FACTURA_C = 11
+CBTE_TIPO_NC_C = 13          # nota de crédito C (numeración propia por PV)
 DOC_TIPO_CONSUMIDOR_FINAL = 99
 DOC_NRO_CONSUMIDOR_FINAL = 0
 
@@ -362,7 +363,9 @@ def sincronizar_comprobantes(
     return {"ultimo": ultimo, "nuevos": len(filas)}
 
 
-def emitir_factura_c(
+def _emitir(
+    cbte_tipo,
+    nombre,
     cuit,
     entorno,
     cert_path,
@@ -375,13 +378,12 @@ def emitir_factura_c(
     doc_tipo=None,
     doc_nro=None,
     cond_iva_receptor=None,
+    asoc=None,
 ):
     """
-    Emite una Factura C por `importe` (total).
-    Receptor opcional: por defecto Consumidor Final (doc 99). Si se pasa
-    `doc_tipo` (80=CUIT, 86=CUIL, 96=DNI) + `doc_nro`, identifica al receptor.
-    `cond_iva_receptor` (RG 5616) por defecto Consumidor Final (5).
-    Devuelve un dict con el resultado (CAE, vencimiento, número, receptor, etc.).
+    Emite un comprobante clase C (`cbte_tipo`) por `importe` total y devuelve el
+    resultado con CAE. `asoc` es el comprobante asociado (para notas de crédito).
+    Lo usan emitir_factura_c() y emitir_nota_credito_c(); no llamarlo directo.
     """
     importe = round(float(importe), 2)
     if importe <= 0:
@@ -405,7 +407,8 @@ def emitir_factura_c(
     auth = get_auth(cuit, entorno, cert_path, key_path, service="wsfe")
     client = _wsfe_client(entorno)
 
-    numero = proximo_numero(client, auth, punto_venta)
+    # Cada tipo de comprobante lleva su propia numeración dentro del punto de venta.
+    numero = proximo_numero(client, auth, punto_venta, cbte_tipo)
 
     detalle = {
         "Concepto": int(concepto),
@@ -417,8 +420,8 @@ def emitir_factura_c(
         "CbteFch": hoy,
         "ImpTotal": importe,
         "ImpTotConc": 0,      # neto no gravado
-        "ImpNeto": importe,   # en Factura C el neto = total (no se discrimina IVA)
         "ImpOpEx": 0,
+        "ImpNeto": importe,   # en los comprobantes C el neto = total (no se discrimina IVA)
         "ImpIVA": 0,
         "ImpTrib": 0,
         "MonId": "PES",
@@ -435,11 +438,15 @@ def emitir_factura_c(
     if actividad:
         detalle["Actividades"] = {"Actividad": [{"Id": int(actividad)}]}
 
+    # Comprobante asociado (nota de crédito: a qué factura corrige).
+    if asoc:
+        detalle["CbtesAsoc"] = {"CbteAsoc": [asoc]}
+
     pedido = {
         "FeCabReq": {
             "CantReg": 1,
             "PtoVta": int(punto_venta),
-            "CbteTipo": CBTE_TIPO_FACTURA_C,
+            "CbteTipo": cbte_tipo,
         },
         "FeDetReq": {"FECAEDetRequest": [detalle]},
     }
@@ -452,14 +459,14 @@ def emitir_factura_c(
 
     if cab.Resultado != "A" or det.Resultado != "A":
         obs = _format_observaciones(getattr(det, "Observaciones", None))
-        raise AfipError(f"ARCA rechazó la factura (Resultado {det.Resultado}). {obs}".strip())
+        raise AfipError(f"ARCA rechazó {nombre.lower()} (Resultado {det.Resultado}). {obs}".strip())
 
     resultado = {
         "cae": det.CAE,
         "cae_vto": det.CAEFchVto,        # yyyymmdd
         "numero": numero,
         "punto_venta": int(punto_venta),
-        "tipo": "Factura C",
+        "tipo": nombre,
         "importe": importe,
         "fecha": hoy,
         "entorno": entorno,
@@ -472,6 +479,78 @@ def emitir_factura_c(
     }
     # La persistencia la hace la ruta (con user_id); afip.py es agnóstico de usuario.
     return resultado
+
+
+def emitir_factura_c(
+    cuit,
+    entorno,
+    cert_path,
+    key_path,
+    punto_venta,
+    importe,
+    concepto=2,
+    fecha=None,
+    actividad=None,
+    doc_tipo=None,
+    doc_nro=None,
+    cond_iva_receptor=None,
+):
+    """
+    Emite una Factura C por `importe` (total).
+    Receptor opcional: por defecto Consumidor Final (doc 99). Si se pasa
+    `doc_tipo` (80=CUIT, 86=CUIL, 96=DNI) + `doc_nro`, identifica al receptor.
+    `cond_iva_receptor` (RG 5616) por defecto Consumidor Final (5).
+    Devuelve un dict con el resultado (CAE, vencimiento, número, receptor, etc.).
+    """
+    return _emitir(
+        CBTE_TIPO_FACTURA_C, "Factura C", cuit, entorno, cert_path, key_path,
+        punto_venta, importe, concepto=concepto, fecha=fecha, actividad=actividad,
+        doc_tipo=doc_tipo, doc_nro=doc_nro, cond_iva_receptor=cond_iva_receptor,
+    )
+
+
+def emitir_nota_credito_c(
+    cuit,
+    entorno,
+    cert_path,
+    key_path,
+    punto_venta,
+    importe,
+    asoc_punto_venta,
+    asoc_numero,
+    asoc_tipo=CBTE_TIPO_FACTURA_C,
+    asoc_fecha=None,
+    concepto=2,
+    fecha=None,
+    actividad=None,
+    doc_tipo=None,
+    doc_nro=None,
+    cond_iva_receptor=None,
+):
+    """
+    Emite una Nota de Crédito C que corrige un comprobante propio (total o
+    parcialmente). `importe` va en positivo: la NC resta por su tipo, no por el
+    signo — quien la muestra la interpreta (ver CBTE_NC en db.py).
+
+    El receptor tiene que ser EL MISMO que el de la factura asociada; ARCA lo
+    valida y rechaza la NC si no coincide. La numeración del tipo 13 es
+    independiente de la de facturas dentro del punto de venta.
+    """
+    solo_digitos = "".join(ch for ch in str(cuit) if ch.isdigit())
+    asoc = {
+        "Tipo": int(asoc_tipo),
+        "PtoVta": int(asoc_punto_venta),
+        "Nro": int(asoc_numero),
+        "Cuit": solo_digitos,          # emisor del asociado: el mismo contribuyente
+    }
+    if asoc_fecha:
+        asoc["CbteFch"] = asoc_fecha
+    return _emitir(
+        CBTE_TIPO_NC_C, "Nota de Crédito C", cuit, entorno, cert_path, key_path,
+        punto_venta, importe, concepto=concepto, fecha=fecha, actividad=actividad,
+        doc_tipo=doc_tipo, doc_nro=doc_nro, cond_iva_receptor=cond_iva_receptor,
+        asoc=asoc,
+    )
 
 
 # --- helpers de errores / log ------------------------------------------------

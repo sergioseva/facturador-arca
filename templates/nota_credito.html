@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Nota de crédito — Factuya{% endblock %}
+{% block style %}
+  .aviso { border: 1px solid var(--border); border-left: 3px solid #fbbf24; border-radius: var(--radius);
+    padding: .9rem 1.1rem; margin: 1.2rem 0; color: var(--muted); font-size: .88rem; line-height: 1.55; }
+  dl.datos { display: grid; grid-template-columns: auto 1fr; gap: .35rem 1.2rem; margin: 0; font-size: .9rem; }
+  dl.datos dt { color: var(--muted); }
+  dl.datos dd { margin: 0; font-variant-numeric: tabular-nums; }
+  .opciones { display: grid; gap: .6rem; margin: .9rem 0 .2rem; }
+  .opciones label { display: flex; gap: .6rem; align-items: baseline; cursor: pointer; font-size: .92rem; }
+  .opciones small { color: var(--muted); }
+  .acciones { display: flex; gap: .7rem; align-items: center; margin-top: 1.2rem; flex-wrap: wrap; }
+  .feedback.err { margin-top: .8rem; }
+{% endblock %}
+{% block content %}
+  <h1>↩️ Nota de crédito</h1>
+  <p class="muted">Corrige una factura ya emitida · entorno {{ entorno }}</p>
+
+  <div class="card">
+    <b>Factura asociada</b>
+    <dl class="datos" style="margin-top:.6rem">
+      <dt>Comprobante</dt><dd>{{ factura.tipo }} {{ '%04d'|format(factura.punto_venta) }}-{{ '%08d'|format(factura.numero) }}</dd>
+      <dt>Fecha</dt><dd>{{ factura.fecha[6:8] }}/{{ factura.fecha[4:6] }}/{{ factura.fecha[0:4] }}</dd>
+      <dt>Importe</dt><dd>$ {{ factura.importe|ars }}</dd>
+      <dt>Receptor</dt><dd>{{ factura.receptor or 'Consumidor Final' }}</dd>
+      <dt>CAE</dt><dd>{{ factura.cae }}</dd>
+    </dl>
+  </div>
+
+  {% if resultado %}
+  <div class="card" style="border-color:var(--primary)">
+    <b>✅ Nota de crédito emitida</b>
+    <dl class="datos" style="margin-top:.6rem">
+      <dt>Tipo</dt><dd>{{ resultado.tipo }}</dd>
+      <dt>Número</dt><dd>{{ '%04d'|format(resultado.punto_venta) }}-{{ '%08d'|format(resultado.numero) }}</dd>
+      <dt>Importe</dt><dd>$ {{ resultado.importe|ars }}</dd>
+      <dt>Receptor</dt><dd>{{ resultado.receptor }}</dd>
+      <dt>CAE</dt><dd>{{ resultado.cae }}</dd>
+      <dt>Vto. CAE</dt><dd>{{ resultado.cae_vto[6:8] }}/{{ resultado.cae_vto[4:6] }}/{{ resultado.cae_vto[0:4] }}</dd>
+    </dl>
+    {% if resultado.observaciones %}<p class="muted" style="margin:.7rem 0 0; font-size:.85rem">{{ resultado.observaciones }}</p>{% endif %}
+    <div class="acciones">
+      {% if resultado.id %}<a class="btn btn-ghost btn-sm" href="{{ url_for('factura_pdf_route', fid=resultado.id) }}" target="_blank">⬇️ Descargar PDF</a>{% endif %}
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('historial') }}">Ver historial</a>
+      {% if resultado.importe|float >= factura.importe|float %}
+      <a class="btn btn-sm" href="{{ url_for('facturar') }}">Emitir la factura correcta</a>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <div class="aviso">
+    La nota de crédito sale por el <b>mismo punto de venta {{ '%04d'|format(factura.punto_venta) }}</b> y con
+    <b>el mismo receptor</b> que la factura — ARCA lo exige y lo valida. Lleva su propia numeración,
+    independiente de la de las facturas. Una vez emitida tiene CAE y tampoco se puede borrar.
+  </div>
+
+  <form method="post" class="card">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <b>¿Por cuánto?</b>
+    <div class="opciones">
+      <label>
+        <input type="radio" name="modo" value="total" checked
+               onclick="document.getElementById('importe').value = '{{ factura.importe|ars }}'">
+        <span>Anular la factura completa — <b>$ {{ factura.importe|ars }}</b><br>
+          <small>Después emitís la factura correcta. Es lo más prolijo si te equivocaste en el importe.</small></span>
+      </label>
+      <label>
+        <input type="radio" name="modo" value="parcial" onclick="document.getElementById('importe').focus()">
+        <span>Sólo una parte<br>
+          <small>La factura original queda en pie y la NC descuenta la diferencia.</small></span>
+      </label>
+    </div>
+
+    <label for="importe">Importe de la nota de crédito</label>
+    <input type="text" inputmode="decimal" name="importe" id="importe"
+           value="{{ factura.importe|ars }}" required>
+
+    <label for="motivo" style="margin-top:.8rem">Motivo (opcional)</label>
+    <input type="text" name="motivo" id="motivo" maxlength="200"
+           placeholder="Ej.: error en el importe facturado">
+
+    {% if error %}<div class="feedback err">❌ {{ error }}</div>{% endif %}
+
+    <div class="acciones">
+      <button type="submit" id="btn-nc"
+              onclick="return confirm('Se va a emitir una Nota de Crédito C en {{ entorno }} por $ ' + document.getElementById('importe').value + '. Es un comprobante fiscal real y no se puede anular. ¿Confirmás?')">
+        Emitir nota de crédito
+      </button>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('historial') }}">Cancelar</a>
+    </div>
+  </form>
+
+  <script>
+    document.querySelector('form').addEventListener('submit', () => {
+      const b = document.getElementById('btn-nc');
+      b.disabled = true; b.innerHTML = '<span class="spinner"></span>Emitiendo…';
+    });
+  </script>
+  {% endif %}
+{% endblock %}

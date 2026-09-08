@@ -1,4 +1,5 @@
-"""Genera el PDF de la Factura C con el formato oficial de ARCA (+ QR)."""
+"""Genera el PDF de los comprobantes C (factura y nota de crédito) con el
+formato oficial de ARCA (+ QR)."""
 
 import base64
 import io
@@ -8,6 +9,14 @@ import qrcode
 from fpdf import FPDF
 
 CBTE_TIPO_FACTURA_C = 11
+CBTE_TIPO_NC_C = 13
+
+
+def _cbte(factura):
+    """(código, título) del comprobante según cómo lo guardó el facturador."""
+    if (factura.get("tipo") or "").lower().startswith("nota de cr"):
+        return CBTE_TIPO_NC_C, "NOTA DE CREDITO"
+    return CBTE_TIPO_FACTURA_C, "FACTURA"
 DOC_NOMBRES = {80: "CUIT", 86: "CUIL", 96: "DNI", 99: "Consumidor Final"}
 COND_IVA_NOMBRES = {
     1: "IVA Responsable Inscripto", 4: "IVA Sujeto Exento", 5: "Consumidor Final",
@@ -36,7 +45,7 @@ def _qr_bytes(factura, emisor):
     f = str(factura["fecha"])
     data = {
         "ver": 1, "fecha": f"{f[0:4]}-{f[4:6]}-{f[6:8]}", "cuit": int(emisor["cuit"]),
-        "ptoVta": int(factura["punto_venta"]), "tipoCmp": CBTE_TIPO_FACTURA_C,
+        "ptoVta": int(factura["punto_venta"]), "tipoCmp": _cbte(factura)[0],
         "nroCmp": int(factura["numero"]), "importe": round(float(factura["importe"]), 2),
         "moneda": "PES", "ctz": 1, "tipoDocRec": int(factura.get("doc_tipo") or 99),
         "nroDocRec": int(factura.get("doc_nro") or 0), "tipoCodAut": "E",
@@ -89,7 +98,7 @@ def _draw(pdf, factura, emisor, copia, qr_bytes):
     pdf.cell(cw, 10, "C", align="C")
     pdf.set_xy(xv - cw / 2, hy + 11.5)
     pdf.set_font("helvetica", "", 6.5)
-    pdf.cell(cw, 3, "COD. 011", align="C")
+    pdf.cell(cw, 3, f"COD. {_cbte(factura)[0]:03d}", align="C")
 
     # columna izquierda (emisor)
     cap = (xv - cw / 2) - x0 - 6   # ancho que no llega a la caja C
@@ -100,9 +109,10 @@ def _draw(pdf, factura, emisor, copia, qr_bytes):
     _lbl(pdf, x0 + 3, ly, lw, "Condición frente al IVA: ", emisor.get("condicion", "Responsable Monotributo"))
 
     # columna derecha (factura)
+    titulo = _cbte(factura)[1]
     pdf.set_xy(xv + 13, hy + 2)
-    pdf.set_font("helvetica", "B", 20)
-    pdf.cell(x1 - (xv + 13), 9, "FACTURA")
+    pdf.set_font("helvetica", "B", 20 if titulo == "FACTURA" else 13)
+    pdf.cell(x1 - (xv + 13), 9, titulo)
     rw = x1 - xv - 4
     ry = hy + 13
     pdf.set_xy(xv + 3, ry)

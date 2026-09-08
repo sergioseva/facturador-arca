@@ -354,6 +354,91 @@ def facturar():
     )
 
 
+@app.route("/nota-credito/<int:fid>", methods=["GET", "POST"])
+@auth.login_required
+def nota_credito(fid):
+    """
+    Emite una Nota de Crédito C que corrige una factura propia. El receptor y el
+    concepto salen de la factura asociada — ARCA exige que coincidan — así que
+    lo único que se elige es el importe (total para anularla, menor para
+    corregir una diferencia).
+    """
+    cfg = db.get_tenant_config(g.user["id"])
+    if not cfg or not cfg.get("delegacion_ok") or not cfg.get("cuit"):
+        return redirect(url_for("onboarding"))
+
+    factura = db.get_factura(g.user["id"], fid)
+    if not factura:
+        abort(404)
+    if (factura.get("tipo") or "").lower().startswith("nota de cr"):
+        abort(404)   # no se emite una NC sobre otra NC
+
+    resultado = None
+    error = None
+    if request.method == "POST":
+        try:
+            importe = _num(request.form.get("importe", ""))
+            if importe <= 0:
+                raise ValueError("El importe de la nota de crédito tiene que ser mayor a 0.")
+            if importe > float(factura["importe"]):
+                raise ValueError(
+                    "La nota de crédito no puede superar el importe de la factura "
+                    f"($ {formato_ars(factura['importe'])})."
+                )
+            motivo = request.form.get("motivo", "").strip()
+            cert, key = _cert_key(cfg["entorno"])
+            resultado = afip.emitir_nota_credito_c(
+                cuit=cfg["cuit"],
+                entorno=cfg["entorno"],
+                cert_path=cert,
+                key_path=key,
+                punto_venta=factura["punto_venta"],
+                importe=importe,
+                asoc_punto_venta=factura["punto_venta"],
+                asoc_numero=factura["numero"],
+                asoc_fecha=factura["fecha"],
+                concepto=cfg["concepto"],
+                # Igual que al facturar: en homologación las actividades no están
+                # vinculadas en el sandbox y ARCA rechazaría con [10223].
+                actividad=(cfg.get("actividad") or None) if cfg["entorno"] == "produccion" else None,
+                # El receptor DEBE ser el mismo que el de la factura asociada.
+                doc_tipo=factura.get("doc_tipo"),
+                doc_nro=factura.get("doc_nro"),
+                cond_iva_receptor=factura.get("cond_iva"),
+            )
+            asociada = f"Factura C {factura['punto_venta']:04d}-{factura['numero']:08d}"
+            desc = motivo or f"Nota de crédito de {asociada}"
+            resultado["condicion_venta"] = factura.get("condicion_venta")
+            resultado["item_descripcion"] = desc
+            resultado["items_json"] = json.dumps(
+                [{"desc": desc, "cant": 1, "precio": resultado["importe"],
+                  "subtotal": resultado["importe"]}], ensure_ascii=False,
+            )
+            resultado["observaciones"] = " ".join(
+                x for x in (f"Asociada a {asociada}.", motivo, resultado.get("observaciones")) if x
+            )
+            resultado["id"] = db.guardar(g.user["id"], resultado)
+        except (afip.AfipError, ValueError) as e:
+            error = str(e)
+        except Exception as e:  # noqa: BLE001
+            error = f"Error inesperado: {e}"
+
+        if error:
+            try:
+                db.registrar_error(
+                    g.user["id"], datetime.now(afip.AR_TZ).isoformat(),
+                    cfg["entorno"], None, f"Nota de crédito: {error}",
+                )
+            except Exception:  # noqa: BLE001
+                pass
+
+    return render_template(
+        "nota_credito.html",
+        factura=factura, resultado=resultado, error=error,
+        entorno=cfg["entorno"], cuit=cfg["cuit"],
+    )
+
+
 @app.route("/api/items-excel", methods=["POST"])
 @auth.login_required
 def api_items_excel():
@@ -432,7 +517,8 @@ def factura_pdf_route(fid):
         "leyenda": cfg.get("leyenda") or "",
     }
     data = pdf.factura_pdf(f, emisor)
-    nombre = f"factura-C-{int(f['punto_venta']):04d}-{int(f['numero']):08d}.pdf"
+    slug = "nota-credito-C" if (f.get("tipo") or "").lower().startswith("nota de cr") else "factura-C"
+    nombre = f"{slug}-{int(f['punto_venta']):04d}-{int(f['numero']):08d}.pdf"
     return Response(
         data, mimetype="application/pdf",
         headers={"Content-Disposition": f'inline; filename="{nombre}"'},
