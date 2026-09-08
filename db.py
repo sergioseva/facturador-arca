@@ -268,6 +268,21 @@ def init_db():
             conn, "mis_comprobantes", _SCHEMA_MIS,
             "entorno, punto_venta, tipo, numero, fecha, importe",
         )
+        # Importaciones viejas guardaron el tipo como código ('11'): así no
+        # matcheaban contra las facturas del facturador y salían duplicadas, y
+        # las notas de crédito quedaron sumando en vez de restar.
+        for r in conn.execute("SELECT DISTINCT tipo FROM mis_comprobantes").fetchall():
+            viejo = r["tipo"]
+            if _tipo_codigo(viejo) in CBTE_NC:
+                conn.execute(
+                    "UPDATE mis_comprobantes SET importe=-abs(importe) WHERE tipo=?", (viejo,)
+                )
+            nuevo = _tipo_nombre(viejo)
+            if nuevo != viejo:
+                # OR REPLACE: si ya existe la misma fila con el tipo canónico, pisa.
+                conn.execute(
+                    "UPDATE OR REPLACE mis_comprobantes SET tipo=? WHERE tipo=?", (nuevo, viejo)
+                )
 
         conn.execute(_SCHEMA_CONFIG)
         conn.execute(_SCHEMA_USERS)
@@ -452,6 +467,42 @@ def _parse_num(s):
         return float(s)
     except ValueError:
         return 0.0
+
+
+def _tipo_codigo(raw):
+    """
+    Código ARCA del comprobante a partir de lo que traiga el CSV, que según la
+    exportación viene como '11', '11 - Factura C' o 'Factura C'. None si no lo
+    reconozco.
+    """
+    s = (raw or "").strip()
+    if not s:
+        return None
+    dig = ""
+    for c in s:                       # '11' y '11 - Factura C' arrancan con el código
+        if c.isdigit():
+            dig += c
+        else:
+            break
+    if dig:
+        return int(dig)
+    n = _norm(s)                      # 'Factura C' -> buscar por nombre
+    for cod, nombre in CBTE_TIPO_NOMBRES.items():
+        if _norm(nombre) == n:
+            return cod
+    return None
+
+
+def _tipo_nombre(raw):
+    """
+    Nombre canónico del comprobante ('Factura C'), igual al que guarda el
+    facturador, para que el cruce entre lo emitido y lo importado matchee.
+    Si no reconozco el tipo devuelvo lo que vino tal cual.
+    """
+    cod = _tipo_codigo(raw)
+    if cod in CBTE_TIPO_NOMBRES:
+        return CBTE_TIPO_NOMBRES[cod]
+    return (raw or "").strip() or "Comprobante"
 
 
 def _parse_fecha(s):
@@ -787,11 +838,13 @@ def importar_mis_comprobantes(user_id, contenido: bytes, entorno: str):
         if not fecha:
             ignoradas += 1
             continue
-        tipo = fila[i_tipo].strip() if i_tipo is not None else "Comprobante"
+        raw_tipo = fila[i_tipo] if i_tipo is not None else ""
+        codigo = _tipo_codigo(raw_tipo)
+        tipo = _tipo_nombre(raw_tipo)
         pv = int(_parse_num(fila[i_pv])) if i_pv is not None else 0
         numero = int(_parse_num(fila[i_num])) if i_num is not None else leidas + 1
         importe = _parse_num(fila[i_imp])
-        if "credito" in _norm(tipo):
+        if codigo in CBTE_NC or "credito" in _norm(tipo):
             importe = -abs(importe)
         registros.append((user_id, entorno, pv, tipo, numero, fecha, importe))
         leidas += 1
@@ -851,7 +904,7 @@ def resumen_detallado(user_id, entorno, fecha_movil):
     init_db()
     with _conn() as conn:
         app_rows = conn.execute(
-            "SELECT punto_venta, numero, fecha, importe FROM facturas "
+            "SELECT tipo, punto_venta, numero, fecha, importe FROM facturas "
             "WHERE user_id=? AND entorno=? AND estado='emitida'",
             (user_id, entorno),
         ).fetchall()
@@ -861,21 +914,27 @@ def resumen_detallado(user_id, entorno, fecha_movil):
             (user_id, entorno),
         ).fetchall()
 
-    app_keys = {(r["punto_venta"], r["numero"]) for r in app_rows}
+    # El mismo comprobante puede venir por los dos lados (lo emitió la app y
+    # además figura en el CSV de ARCA): se identifica por tipo + PV + número, y
+    # gana el del facturador. Los tipos se comparan normalizados porque el CSV
+    # los trae como código ('11') y el facturador como nombre ('Factura C').
+    def clave(tipo, pv, numero):
+        return (_norm(_tipo_nombre(tipo)), pv, numero)
+
+    app_keys = {clave(r["tipo"] or "Factura C", r["punto_venta"], r["numero"]) for r in app_rows}
     comprobantes = [
         {
-            "fecha": r["fecha"], "tipo": "Factura C", "punto_venta": r["punto_venta"],
+            "fecha": r["fecha"], "tipo": r["tipo"] or "Factura C", "punto_venta": r["punto_venta"],
             "numero": r["numero"], "importe": r["importe"], "origen": "facturador",
         }
         for r in app_rows
     ]
     for r in mis_rows:
-        es_factura = "factura" in _norm(r["tipo"])
-        if es_factura and (r["punto_venta"], r["numero"]) in app_keys:
+        if clave(r["tipo"], r["punto_venta"], r["numero"]) in app_keys:
             continue
         comprobantes.append(
             {
-                "fecha": r["fecha"], "tipo": r["tipo"], "punto_venta": r["punto_venta"],
+                "fecha": r["fecha"], "tipo": _tipo_nombre(r["tipo"]), "punto_venta": r["punto_venta"],
                 "numero": r["numero"], "importe": r["importe"], "origen": "importada",
             }
         )
@@ -969,10 +1028,7 @@ def importar_recibidos(user_id, contenido: bytes):
         if not fecha:
             ignoradas += 1
             continue
-        try:
-            tipo = int(_parse_num(fila[i_tipo])) if i_tipo is not None else 0
-        except (ValueError, TypeError):
-            tipo = 0
+        tipo = (_tipo_codigo(fila[i_tipo]) or 0) if i_tipo is not None else 0
         pv = int(_parse_num(fila[i_pv])) if i_pv is not None else 0
         numero = int(_parse_num(fila[i_num])) if i_num is not None else leidas + 1
         emi_doc = "".join(c for c in (fila[i_emi_doc] or "") if c.isdigit())
