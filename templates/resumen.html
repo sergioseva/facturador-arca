@@ -74,7 +74,11 @@
       Topes vigentes desde {{ vigente_desde }} (ARCA){% if topes_actualizado %} · actualizados el {{ topes_actualizado }}{% endif %}.
       <form method="post" style="display:inline" id="form-topes">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" name="refrescar_topes" value="1" id="btn-topes" class="link-btn">↻ Actualizar desde ARCA</button>
+        <!-- La acción va en un hidden y no en el name/value del botón: el submit
+             lo deshabilita para dar feedback, y un control deshabilitado no se
+             envía (el form data se arma después del evento 'submit'). -->
+        <input type="hidden" name="refrescar_topes" value="1">
+        <button type="submit" id="btn-topes" class="link-btn">↻ Actualizar desde ARCA</button>
       </form>
     </p>
 

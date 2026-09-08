@@ -10,24 +10,24 @@ import re
 
 import requests
 
-VIGENTE_DESDE = "01/02/2026"
+VIGENTE_DESDE = "01/08/2026"
 FUENTE = "https://www.afip.gob.ar/monotributo/categorias.asp"
 
 CATS = list("ABCDEFGHIJK")
 
 # categoría -> ingresos brutos anuales máximos (ARS)
 TOPES = {
-    "A": 10_277_988.13,
-    "B": 15_058_447.71,
-    "C": 21_113_696.52,
-    "D": 26_212_853.42,
-    "E": 30_833_964.37,
-    "F": 38_642_048.36,
-    "G": 46_211_109.37,
-    "H": 70_113_407.33,
-    "I": 78_479_211.62,
-    "J": 89_872_640.30,
-    "K": 108_357_084.05,
+    "A": 12_009_410.45,
+    "B": 17_595_182.74,
+    "C": 24_670_494.31,
+    "D": 30_628_651.43,
+    "E": 36_028_231.33,
+    "F": 45_151_659.41,
+    "G": 53_995_798.87,
+    "H": 81_924_660.37,
+    "I": 91_699_761.90,
+    "J": 105_012_519.20,
+    "K": 126_610_838.75,
 }
 
 
@@ -72,5 +72,9 @@ def fetch_topes_arca(timeout=20):
         raise ValueError("Los valores no parecen ingresos brutos; revisá la página de ARCA.")
 
     m = re.search(r"desde el\s*([0-9]{1,2}/[0-9]{1,2}/[0-9]{4})", html)
-    vigente = m.group(1) if m else VIGENTE_DESDE
+    if m:
+        d, mes, anio = m.group(1).split("/")
+        vigente = f"{int(d):02d}/{int(mes):02d}/{anio}"
+    else:
+        vigente = VIGENTE_DESDE
     return topes, vigente
