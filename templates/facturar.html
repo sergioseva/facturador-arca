@@ -18,6 +18,56 @@
   table.items .precio { text-align: right; }
   table.items td.sub { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 600; min-width: 90px; }
   table.items th.r, table.items td.r { text-align: right; }
+  table.items .pw { position: relative; }
+  table.items .pw .cur { display: none; }
+  table.items td[data-lbl]::before { display: none; }
+
+  /* En el celular cada ítem es una tarjeta: el precio unitario se ve grande y completo */
+  @media (max-width: 560px) {
+    table.items { display: block; margin-top: .4rem; }
+    table.items thead { display: none; }
+    table.items tbody { display: block; }
+    table.items tr {
+      display: grid;
+      grid-template-columns: 4.7rem 1fr auto;
+      grid-template-areas: "desc desc del" "cant precio precio" "sub sub sub";
+      gap: .45rem .6rem;
+      align-items: end;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: .75rem .75rem .7rem;
+      margin-bottom: .65rem;
+    }
+    table.items tr:hover { background: var(--surface-2); }
+    table.items td { display: block; padding: 0; border: none; }
+    table.items td.c-desc { grid-area: desc; }
+    table.items td.c-cant { grid-area: cant; }
+    table.items td.c-precio { grid-area: precio; }
+    table.items td.c-sub { grid-area: sub; }
+    table.items td.c-del { grid-area: del; align-self: center; }
+    table.items td[data-lbl]::before {
+      content: attr(data-lbl); display: block; font-size: .66rem; text-transform: uppercase;
+      letter-spacing: .05em; color: var(--muted); font-weight: 700; margin-bottom: .25rem;
+    }
+    table.items .cant { width: 100%; font-size: 1.15rem; padding: .6rem .45rem; font-variant-numeric: tabular-nums; }
+    table.items .precio {
+      width: 100%; font-size: 1.35rem; font-weight: 700; line-height: 1.25;
+      padding: .5rem .6rem .5rem 1.45rem; font-variant-numeric: tabular-nums;
+    }
+    table.items .precio.largo { font-size: 1.15rem; }
+    table.items .precio.muy-largo { font-size: 1rem; }
+    table.items .pw .cur {
+      display: block; position: absolute; left: .5rem; top: 50%; transform: translateY(-50%);
+      color: var(--muted); font-size: .95rem; font-weight: 600; pointer-events: none;
+    }
+    table.items td.c-sub {
+      display: flex; justify-content: space-between; align-items: baseline;
+      border-top: 1px dashed var(--border); margin-top: .2rem; padding-top: .5rem; font-size: 1rem;
+    }
+    table.items td.c-sub::before { margin-bottom: 0; }
+    table.items td.c-del .del-item { font-size: 1.2rem; padding: .3rem .1rem; }
+  }
   .del-item { background: none; border: none; color: var(--err-fg); cursor: pointer; font-size: 1.05rem; padding: 0 .2rem; }
   .acciones-items { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; margin-top: .6rem; }
   .total-row { display: flex; justify-content: space-between; align-items: baseline; margin-top: 1rem; padding-top: .9rem; border-top: 1px solid var(--border); font-size: 1.05rem; color: var(--muted); }
@@ -208,21 +258,32 @@
       return total;
     }
 
+    // El precio se achica solo si el número es largo, así siempre se ve entero
+    function ajustarPrecio(inp){
+      const n=inp.value.length;
+      inp.classList.toggle('largo', n>11 && n<=14);
+      inp.classList.toggle('muy-largo', n>14);
+    }
     function numToAR(n){ return (n===undefined||n===null||n==='')?'':fmtMiles(String(n).replace('.',',')); }
     function addRow(desc, focus, cant, precio){
       const tr=document.createElement('tr');
-      tr.innerHTML=`<td><input type="text" name="item_desc" list="items-datalist" autocomplete="off" placeholder="Descripción"></td>
-        <td><input type="text" name="item_cant" class="cant" value="1" inputmode="decimal"></td>
-        <td><input type="text" name="item_precio" class="precio" inputmode="decimal" placeholder="0,00"></td>
-        <td class="sub">$ 0,00</td>
-        <td><button type="button" class="del-item" title="Quitar">✕</button></td>`;
+      tr.innerHTML=`<td class="c-desc"><input type="text" name="item_desc" list="items-datalist" autocomplete="off" placeholder="Descripción"></td>
+        <td class="c-cant" data-lbl="Cantidad"><input type="text" name="item_cant" class="cant" value="1" inputmode="decimal"></td>
+        <td class="c-precio" data-lbl="Precio unit."><div class="pw"><span class="cur">$</span><input type="text" name="item_precio" class="precio" inputmode="decimal" placeholder="0,00"></div></td>
+        <td class="sub c-sub" data-lbl="Subtotal">$ 0,00</td>
+        <td class="c-del"><button type="button" class="del-item" title="Quitar">✕</button></td>`;
       itemsBody.appendChild(tr);
       if(desc) tr.querySelector('input[name=item_desc]').value=desc;
       if(cant!==undefined && cant!=='') tr.querySelector('.cant').value=numToAR(cant);
       if(precio!==undefined && precio!=='') tr.querySelector('.precio').value=numToAR(precio);
-      tr.querySelector('.precio').addEventListener('input',(e)=>{ e.target.value=fmtMiles(e.target.value); recompute(); });
+      tr.querySelector('.precio').addEventListener('input',(e)=>{ e.target.value=fmtMiles(e.target.value); ajustarPrecio(e.target); recompute(); });
+      ajustarPrecio(tr.querySelector('.precio'));
       tr.querySelector('.cant').addEventListener('input',recompute);
       tr.querySelector('.del-item').addEventListener('click',()=>{ if(itemsBody.querySelectorAll('tr').length>1){ tr.remove(); recompute(); } });
+      tr.querySelectorAll('.cant, .precio').forEach(inp=>inp.addEventListener('focus',()=>{
+        // En el celular el teclado tapa la fila: la centramos para ver lo que se escribe
+        if(window.matchMedia('(max-width: 560px)').matches) setTimeout(()=>tr.scrollIntoView({block:'center', behavior:'smooth'}), 250);
+      }));
       if(focus) tr.querySelector('.precio').focus();
       recompute();
     }
